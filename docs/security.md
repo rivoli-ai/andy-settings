@@ -1,328 +1,189 @@
-# Andy Settings — Security
+# Security
 
-## Security Objectives
+## Objectives
 
-Andy Settings manages configuration that may include service endpoints, credentials references, runtime controls, and user/team-scoped settings. Security is therefore a primary design concern.
+Andy Settings manages configuration that may include service endpoints, credential references, runtime controls, and user/team-scoped settings. Security is a primary design concern.
 
-Objectives:
-
-- authenticate all non-bootstrap access
-- authorize all reads and writes by operation and scope
-- isolate secrets from ordinary settings values
-- maintain auditable change history
-- minimize local attack surface in desktop mode
-- support secure containerized deployment patterns
+- Authenticate all non-bootstrap access
+- Authorize all reads and writes by operation and scope via RBAC
+- Encrypt secrets at rest; only decrypt for authorized users
+- Maintain auditable, append-only change history
+- Minimize attack surface in embedded (Conductor) mode
 
 ## Threat Model
 
-Primary risks include:
+Primary risks:
 
-- unauthorized reading of settings values
-- unauthorized modification of settings
-- privilege escalation through scope misuse
-- secret disclosure
-- insecure local bootstrap flows
-- token misuse in CLI or MCP contexts
-- audit tampering
-- insecure default Docker configuration
-
-## Security Principles
-
-- secure by default
-- least privilege
-- separation of duties
-- explicit scope boundaries
-- deny-by-default authorization
-- no plaintext secrets in general settings tables
-- immutable audit trail where practical
+- Unauthorized reading of settings values
+- Unauthorized modification of settings
+- Privilege escalation through scope misuse
+- Secret disclosure (plaintext leak, log exposure, export leak)
+- Token misuse in CLI or MCP contexts
+- Audit tampering
 
 ## Authentication
 
-## Primary Authentication Provider
+### Andy Auth Integration
 
-Andy Settings should rely on Andy Auth for OAuth 2.0 / OIDC authentication.
+Andy Settings uses Andy Auth for OAuth 2.0 / OIDC authentication.
 
 Supported client types:
 
-- browser SPA
-- CLI public client
-- backend confidential client
-- local desktop or host app public client
-- MCP-adjacent tool host integration where appropriate
+- Browser SPA (Angular, PKCE)
+- CLI public client (Device Flow)
+- Backend confidential client (service-to-service)
+- Conductor (tokens forwarded via UnifiedProxy)
 
-## Local Bootstrap Mode
+### Embedded Bootstrap Mode
 
-Because the initial system is local-first, bootstrap mode is required for first-run setup.
+For Conductor first-run when Andy Auth is not yet configured:
 
-Rules:
+- Available only on localhost
+- Auto-disabled once initial setup is complete
+- Heavily logged to audit
+- Cannot be enabled in shared deployment mode
 
-- available only on localhost
-- disabled automatically once initial admin/bootstrap state is established
-- heavily logged to audit
-- cannot be exposed in shared deployment mode
+### Token Handling
 
-Bootstrap capabilities should be minimal:
-
-- initialize data store
-- create initial local admin
-- configure authority / auth mode
-
-## Token Handling
-
-Rules:
-
-- API accepts bearer tokens
-- Angular client uses OIDC best practices for SPA flows
-- CLI stores tokens securely using OS-native secure storage where possible
-- access tokens are never logged
-- refresh tokens are handled only where required and securely stored
+- API accepts JWT Bearer tokens
+- Angular client uses OIDC best practices
+- CLI stores tokens securely (OS-native storage where possible)
+- Access tokens are never logged
+- Conductor forwards Authorization headers through UnifiedProxy
 
 ## Authorization
 
-Authorization should be enforced using Andy RBAC.
+### RBAC Model
 
-### Permission Model
+All access is RBAC-gated via Andy RBAC with application code `settings`. Users only see settings they are authorized to view.
 
-Suggested permissions:
+Permissions:
 
-- `andy-settings:definition:read`
-- `andy-settings:definition:write`
-- `andy-settings:value:read`
-- `andy-settings:value:write`
-- `andy-settings:secret:read`
-- `andy-settings:secret:write`
-- `andy-settings:audit:read`
-- `andy-settings:team:admin`
-- `andy-settings:bootstrap:admin`
+| Permission | Description |
+|---|---|
+| `definition:read` | View setting definitions |
+| `definition:write` | Create/update definitions |
+| `definition:delete` | Delete definitions |
+| `value:read` | Read setting values |
+| `value:write` | Set/update setting values |
+| `value:delete` | Delete setting values |
+| `secret:read` | Decrypt and view secret values |
+| `secret:write` | Set/rotate secrets |
+| `audit:read` | View audit history |
+| `export:read` | Export settings |
+| `import:write` | Import settings |
 
 ### Scope-Aware Authorization
 
-Permission checks must include scope context.
+Permission checks include scope context:
 
-Examples:
-
-- a user may read their own user-scoped settings but not another user’s
-- team admins may mutate team-scoped values for their team only
-- machine scope changes may require elevated local admin permissions
-- secret reads should be more restricted than ordinary value reads
+- Users can read/write their own user-scoped settings but not others'
+- Team admins can mutate team-scoped values for their team only
+- Machine scope changes require elevated permissions
+- Secret reads are more restricted than ordinary value reads
 
 ### Application Layer Enforcement
 
-Authorization must not live only in controllers.
+Authorization is enforced in the application service layer, not just controllers. This ensures MCP tools, CLI operations, and any future interfaces enforce the same rules.
 
-Enforce checks in:
+## Secret Security
 
-- application services
-- mutation handlers
-- secret access flows
-- import/export flows
-- MCP tool handlers
-- CLI server-side operations
+### Encryption Strategy
 
-## Secrets Security
+Secrets are encrypted using ASP.NET Core Data Protection API (AES-256-GCM):
 
-## Secret Storage Strategy
+- Setting definitions marked with `is_secret = true`
+- Secret values are encrypted before storage in the `encrypted_secrets` table
+- Decryption only occurs when the requesting user has `secret:read` permission
+- Data Protection keys stored in a protected volume (`/app/.aspnet/DataProtection-Keys` in Docker)
 
-Do not store secret payloads in plaintext settings tables.
+### Secret Read Rules
 
-Instead:
+- Reading a secret requires explicit `secret:read` permission
+- UI masks secrets by default; RBAC-gated reveal toggle
+- CLI avoids printing secret values unless explicitly requested and authorized
+- Exports mask secrets unless `--include-secrets` flag and `secret:read` permission
+- Audit captures secret access metadata without logging the payload
 
-- store setting metadata and secret references in main persistence
-- store actual secret material in macOS Keychain in local-first mode
-- allow future backends for shared deployments
+### Secret Rotation
 
-## Secret Read Rules
-
-- reading a secret requires explicit permission
-- UI should mask secrets by default
-- CLI should avoid printing secret values unless explicitly requested and authorized
-- audit should capture secret access metadata without logging the payload
-
-## Secret Rotation
-
-- support rotation without exposing prior values
-- rotation should emit audit metadata
-- rotations should invalidate relevant caches
+- Rotation creates a new encrypted value without exposing the prior value
+- Rotation emits an audit event (metadata only, no payload)
+- Consumers should re-read settings after rotation
 
 ## Data Protection
 
 ### At Rest
 
-Local-first mode:
+Embedded mode (Conductor):
 
-- SQLite file protected by OS file permissions
-- secret payloads in Keychain
-- optional database encryption may be added later if required
+- SQLite file at `~/Library/Application Support/ai.rivoli.conductor/db/andy-settings.sqlite`
+- Protected by macOS file permissions and user account isolation
+- Data Protection keys in app support directory
 
 Shared mode:
 
-- PostgreSQL disk encryption handled by deployment platform
-- secret backend chosen according to shared deployment architecture
+- PostgreSQL with platform-managed disk encryption
+- Data Protection keys in mounted Docker volume
 
 ### In Transit
 
-- HTTPS required outside strictly local development scenarios
-- secure cookies / token transport as applicable
-- gRPC over TLS in shared mode
-- local HTTP allowances only for developer workflows where explicitly configured
+- HTTPS required (self-signed certs for development, real certs for production)
+- Conductor: HTTP on localhost is acceptable (UnifiedProxy is same-machine)
 
 ## Audit and Accountability
 
-Every mutation of settings should produce audit metadata including:
+Every mutation produces an audit event:
 
-- actor identity
-- operation type
-- setting key
-- target scope
-- timestamp
-- correlation id
+- Actor identity (from JWT claims)
+- Operation type (created, updated, deleted, secretRotated, imported, exported)
+- Setting key and scope
+- Before/after metadata (secret payloads excluded)
+- Correlation ID for request tracing
+- Timestamp
 
-Audit records for secrets should not include plaintext secret values.
-
-Suggested audit event types:
-
-- definition created
-- definition updated
-- definition deleted
-- value created
-- value updated
-- value deleted
-- secret written
-- secret rotated
-- export generated
-- import attempted
-- bootstrap enabled/disabled
+Audit records are append-only. The audit table has no UPDATE/DELETE operations exposed.
 
 ## Input Validation
 
-All mutation paths must validate:
+All mutation paths validate:
 
-- known definition exists
-- value shape matches definition type
-- scope is allowed for definition
-- actor is allowed for target scope
-- secret operations use secret-aware path only
-- bulk import payloads are schema-valid
+- Definition exists for the target key
+- Value shape matches definition data type
+- Scope is in the definition's allowed scopes
+- Actor is authorized for the target scope
+- Secret operations use the secret-specific path
+- Import payloads are schema-valid before applying
 
-Reject unknown or malformed inputs explicitly.
+## Concurrency
 
-## Concurrency and Integrity
+Optimistic concurrency for setting assignments:
 
-Use optimistic concurrency for settings updates.
-
-Measures:
-
-- etag or version field on assignments
-- conflict detection on update
-- explicit error response for stale writes
-- audit correlation for concurrent write failures where useful
+- `version` and `etag` fields on assignments
+- Conflict detection on update (409 Conflict response)
+- Audit correlation for concurrent write failures
 
 ## MCP Security
 
-MCP introduces a tool-mediated access path and should be treated as a privileged integration surface.
+MCP tools enforce the same auth and RBAC model as the REST API:
 
-Rules:
-
-- same auth and RBAC model as API-backed mutations
-- mutation tools are permission-gated
-- secret access tools are strongly restricted
-- no hidden side effects
-- tool schemas should be explicit and typed
-- audit every mutation performed via MCP
-
-## CLI Security
-
-The CLI should:
-
-- store tokens securely
-- support logout and token revocation workflows where possible
-- redact secrets in normal output
-- require explicit flags for dangerous operations
-- avoid shell-history leakage for secrets where possible
-
-Examples:
-
-- support reading secret values from stdin
-- discourage passing secrets directly on command line
-
-## Web UI Security
-
-The Angular client should:
-
-- use OIDC best practices
-- protect routes with auth guards
-- hide unauthorized actions in the UI while still relying on server enforcement
-- use CSRF protections as appropriate for cookie-based admin flows
-- sanitize user-generated display content
+- Mutation tools are permission-gated
+- Secret access tools require `secret:read`
+- Every mutation via MCP is audited
+- Tool schemas are explicit and typed
 
 ## Docker / Container Security
 
-### API Container
+API container:
 
-- run as non-root where practical
-- minimal runtime image
-- no secret material baked into image
-- environment-based bootstrap only for non-secret values
-- mount certificates and config explicitly
-
-### Web Container
-
-- static assets served by hardened web server or reverse proxy
-- no runtime secrets in frontend bundle
-- environment-specific API endpoints injected safely
-
-### Compose Defaults
-
-- local dev compose should be clearly marked non-production
-- avoid exposing services unnecessarily beyond localhost in dev
-- separate dev certificates from production certs
+- Runs as non-root user (`andysettings`)
+- Minimal runtime image (aspnet:8.0)
+- No secrets baked into image
+- Corporate CA certs mounted as volumes
+- Data Protection keys in named volume
 
 ## Logging Security
 
-Never log:
+Never log: access tokens, refresh tokens, secret payloads, raw Authorization headers.
 
-- access tokens
-- refresh tokens
-- secret payloads
-- raw authorization headers
-- full Keychain handles if sensitive
-
-Do log:
-
-- auth success/failure events
-- authorization denials
-- bootstrap usage
-- mutation metadata
-- security configuration warnings
-
-## Security Testing Requirements
-
-Security-focused tests should validate:
-
-- unauthorized requests rejected
-- cross-scope access prevented
-- secret payload not persisted in wrong store
-- audit trails exist for mutations
-- token-less access denied after bootstrap completion
-- MCP unauthorized tools denied
-- CLI dangerous operations require explicit inputs
-
-## Hardening Roadmap
-
-### MVP
-
-- authn via Andy Auth
-- authz via Andy RBAC
-- Keychain secrets
-- audit logging
-- optimistic concurrency
-- basic rate limiting on API
-
-### Later
-
-- stricter anomaly detection
-- export signing / integrity metadata
-- optional database encryption
-- secret backend pluggability for hosted mode
-- stronger bootstrap lock-down workflows
-- advanced admin approval for high-risk changes
+Do log: auth success/failure, authorization denials, bootstrap usage, mutation metadata, security warnings.

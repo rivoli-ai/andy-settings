@@ -1,0 +1,55 @@
+site_name: Andy Settings
+site_description: Centralized configuration and settings management for the Andy ecosystem
+site_url: https://rivoli-ai.github.io/andy-settings/
+repo_url: https://github.com/rivoli-ai/andy-settings
+repo_name: rivoli-ai/andy-settings
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: blue
+      accent: cyan
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: blue
+      accent: cyan
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - toc.follow
+
+nav:
+  - Home: index.md
+  - Getting Started:
+    - Quick Start: getting-started.md
+    - Docker Setup: devops.md
+  - Architecture: architecture.md
+  - Features: features.md
+  - Security: security.md
+  - Implementation: implementation.md
+  - Testing: testing.md
+  - Stories: stories.md
+  - Examples:
+    - Overview: examples.md
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight
+  - pymdownx.tabbed:
+      alternate_style: true
+  - tables
+  - toc:
+      permalink: true

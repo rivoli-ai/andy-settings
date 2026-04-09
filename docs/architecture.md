@@ -1,212 +1,101 @@
-# Andy Settings — Architecture
+# Architecture
 
 ## Overview
 
-Andy Settings is a local-first configuration platform for the Andy ecosystem. It provides typed setting definitions, scoped assignments, effective-value resolution, secrets indirection, audit history, and access through Web UI, REST, gRPC, MCP, and CLI.
+Andy Settings is the configuration control plane for the Andy ecosystem. It provides typed setting definitions, scoped assignments, effective-value resolution, encrypted secrets, audit history, and access through Web UI, REST, MCP, and CLI.
 
-The architecture is designed to satisfy two deployment modes:
+The architecture supports two deployment modes:
 
-1. **Local Desktop Mode**
-   - single Mac
-   - local API
-   - local UI
-   - SQLite
-   - macOS Keychain
-   - localhost services
-
-2. **Shared Service Mode**
-   - hosted API
-   - Angular client
-   - PostgreSQL
-   - team/user scopes
-   - service-to-service consumption
+1. **Embedded Mode** -- runs inside the Conductor macOS app as the 8th embedded .NET service (port 9107, prefix `/settings`, SQLite backend)
+2. **Shared Service Mode** -- hosted API, Angular client, PostgreSQL, team/user scopes, service-to-service consumption
 
 ## Architectural Principles
 
-- Local-first before remote-first.
+- Embedded-first, shared-second.
 - Typed configuration, not just stringly typed key/value.
 - Schema and validation live with definitions.
-- Secrets are separate from general values.
+- Secrets are encrypted and RBAC-gated.
 - A single domain model is exposed consistently over all interfaces.
-- Scope resolution must be deterministic and explainable.
-- Same repo contains API, client SDKs, CLI, MCP server, and web UI.
-- Docker and Docker Compose remain first-class for local development.
+- Scope resolution is deterministic and explainable.
+- Same repo contains API, CLI, MCP server, web UI, and examples.
 
 ## Context Diagram
 
 ```text
 +---------------------------------------------------------------+
-|                        Andy Settings Repo                      |
-|                                                               |
+|                     Andy Settings Repo                         |
+|                                                                |
 |  +------------------+   +------------------+   +------------+  |
 |  | ASP.NET Core API |   | Angular Web App  |   | CLI        |  |
-|  | REST + gRPC      |   | OIDC + RBAC      |   | dotnet tool|  |
+|  | REST + Swagger   |   | OIDC + RBAC      |   | dotnet tool|  |
 |  +---------+--------+   +---------+--------+   +------+-----+  |
 |            |                      |                    |        |
 |            +----------+-----------+--------------------+        |
-|                       |                                        |
-|                 +-----v--------------------+                   |
-|                 | Settings Domain Layer    |                   |
-|                 | definitions / resolver   |                   |
-|                 | audit / secrets / policy |                   |
-|                 +-----+--------------------+                   |
-|                       |                                        |
-|        +--------------+---------------+                        |
-|        |                              |                        |
-|  +-----v-----------------+      +-----v------------------+     |
-|  | Persistence Layer     |      | Secret Backend         |     |
-|  | SQLite / PostgreSQL   |      | macOS Keychain         |     |
-|  +-----------------------+      +------------------------+     |
-|                                                               |
+|                       |                                         |
+|            +----------v-----------+                             |
+|            | Application Layer    |                             |
+|            | resolver / validator |                             |
+|            | audit / secrets      |                             |
+|            +----------+-----------+                             |
+|                       |                                         |
+|        +--------------+---------------+                         |
+|        |                              |                         |
+|  +-----v-----------------+    +-------v--------------+          |
+|  | Infrastructure Layer  |    | MCP Tools            |          |
+|  | SQLite / PostgreSQL   |    | Model Context Protocol|         |
+|  +-----------------------+    +----------------------+          |
 +---------------------------------------------------------------+
 
 External Integrations:
+- Conductor (macOS host app, Swift, embeds andy-settings as service)
 - Andy Auth (OIDC / OAuth2)
 - Andy RBAC (authorization)
-- Andy Containers / DevPilot / Code Index / Docs / host app
+- Andy Containers / DevPilot / Code Index / Docs (consumers)
 - MCP clients / AI assistants
 ```
 
-## Logical Components
+## Solution Structure
 
-### 1. Domain Layer
-
-The domain layer is the heart of the system and contains the core abstractions.
-
-Responsibilities:
-
-- setting definitions
-- setting assignments
-- scope hierarchy
-- effective value resolution
-- validation
-- secret reference handling
-- audit events
-- import/export model
-
-Suggested projects:
-
-- `Andy.Settings.Abstractions`
-- `Andy.Settings`
-
-### 2. API Layer
-
-The API layer is an ASP.NET Core application exposing:
-
-- REST endpoints
-- gRPC services
-- authn/authz integration
-- health probes
-- OpenAPI
-- server-side validation
-
-Suggested project:
-
-- `Andy.Settings.Api`
-
-### 3. Client SDK Layer
-
-Client SDKs simplify integration from Andy services.
-
-Suggested projects:
-
-- `Andy.Settings.Client`
-- `Andy.Settings.AspNetCore`
-
-The ASP.NET Core integration package should support:
-
-- client registration
-- typed options binding
-- live refresh subscription integration
-- startup validation
-
-### 4. Persistence Layer
-
-The persistence layer uses EF Core and supports multiple providers.
-
-Suggested project:
-
-- `Andy.Settings.EntityFramework`
-
-Backends:
-
-- SQLite for local-first mode
-- PostgreSQL for shared/team mode
-
-### 5. Secret Layer
-
-Secrets should be stored outside the main settings tables.
-
-Suggested project:
-
-- `Andy.Settings.Secrets.Keychain`
-
-Responsibilities:
-
-- macOS Keychain integration
-- secret reference generation
-- secret retrieval and rotation
-- future secret backend abstraction
-
-### 6. CLI Layer
-
-A first-party CLI in the same repo should use the same client SDKs.
-
-Suggested project:
-
-- `Andy.Settings.Cli`
-
-### 7. MCP Layer
-
-The MCP server should expose the settings domain as tools.
-
-Suggested project:
-
-- `Andy.Settings.Mcp`
-
-Responsibilities:
-
-- expose safe tools for listing, resolving, updating, and auditing settings
-- enforce auth and RBAC where applicable
-- support local desktop assistant workflows
-
-### 8. Web UI Layer
-
-Angular application in the same repo.
-
-Suggested path:
-
-- `web/andy-settings-web` or `client/andy-settings-web`
-
-Responsibilities:
-
-- definitions browser
-- values editor
-- scope inspector
-- secrets workflows
-- audit views
-- auth-aware UX
+```text
+andy-settings/
+├── src/
+│   ├── Andy.Settings.Domain/           # Entities, enums (no dependencies)
+│   ├── Andy.Settings.Application/      # Interfaces, DTOs, options (→ Domain)
+│   ├── Andy.Settings.Infrastructure/   # EF Core, repositories, services (→ Domain, Application)
+│   ├── Andy.Settings.Api/              # ASP.NET Core REST + MCP + Swagger (→ all)
+│   └── Andy.Settings.Shared/           # Shared types for client libraries
+├── tools/
+│   └── Andy.Settings.Cli/             # CLI tool
+├── tests/
+│   ├── Andy.Settings.Tests.Unit/      # Unit tests
+│   └── Andy.Settings.Tests.Integration/ # Integration tests
+├── client/                            # Angular SPA
+├── examples/                          # Multi-language API/MCP examples
+├── docs/                              # MkDocs documentation
+├── certs/                             # Corporate CA certificates
+├── Dockerfile                         # Multi-stage build
+└── docker-compose.yml                 # PostgreSQL + API
+```
 
 ## Domain Model
 
 ### Setting Definition
 
-A definition describes what a setting is.
+A definition describes what a setting is. Definitions are the schema layer.
 
 Fields:
 
-- key
-- application code
-- service code
+- key (unique, dot-separated, e.g. `andy.containers.defaultProvider`)
+- application code (which Andy service owns this definition)
 - display name
 - description
 - category
-- data type
+- data type (string, integer, boolean, decimal, enum, duration, uri, json, stringList, secret)
 - allowed scopes
 - default value
-- validation rules
-- UI schema metadata
-- secret flag
+- validation rules (JSON schema)
+- UI metadata for form generation
+- is secret flag
 - tags
 - deprecation metadata
 
@@ -216,77 +105,91 @@ An assignment stores a value at a specific scope.
 
 Fields:
 
-- definition id
-- scope type
-- scope id
-- subject type
-- subject id
-- value payload
-- version
-- etag
+- definition ID
+- scope type (machine, application, service, user, team, workspace, runtimeOverride)
+- scope ID
+- value payload (JSON)
+- version / etag (optimistic concurrency)
 - actor metadata
 - timestamps
 
-### Secret Reference
+### Encrypted Secret
 
-Secret-bearing settings store a reference rather than the secret payload.
+Secret-bearing settings store encrypted values that are only accessible to authorized users.
 
 Fields:
 
-- logical key
-- backend kind
-- secret handle
-- created at
-- rotated at
+- definition ID
+- scope type / scope ID
+- encrypted value (AES-256-GCM via ASP.NET Core Data Protection)
+- created at / rotated at
+
+Secrets are:
+
+- Encrypted at rest using ASP.NET Core Data Protection API
+- Only decrypted when the requesting user has the `secret:read` RBAC permission
+- Never returned in plain text in list/export operations unless explicitly requested with `secret:read`
+- Rotation creates a new encrypted value and emits an audit event (without logging the payload)
 
 ### Audit Event
 
-Append-only record of config operations.
+Append-only record of configuration operations.
 
 Fields:
 
-- event id
-- event type
-- actor
+- event type (created, updated, deleted, secretRotated, imported, exported)
+- actor (from JWT claims)
 - definition key
 - scope
-- before metadata
-- after metadata
-- trace id / correlation id
+- before/after metadata (secrets excluded)
+- correlation ID / trace ID
 - timestamp
 
 ## Scope Resolution Engine
 
-The resolution engine computes effective values for a context.
+The resolution engine computes effective values for a given context.
 
-Inputs:
+Scope precedence (highest wins):
 
-- subject context
-- app context
-- service context
-- workspace context
-- requested setting key(s)
+1. runtime override
+2. workspace
+3. team
+4. user
+5. service
+6. application
+7. machine
+8. built-in default (from definition)
 
-Outputs:
+Each resolution result includes:
 
 - effective value
-- winning assignment
-- source chain
+- winning scope
+- full source chain (all assignments considered)
 - validation result
 - explanation metadata
 
-Suggested scope precedence:
+This powers the "why is this value active?" UX in the API, CLI, MCP, and web UI.
 
-1. built-in default
-2. machine
-3. application
-4. service
-5. user
-6. team
-7. workspace
-8. runtime override
+## Conductor Integration
 
-This should be configurable at the framework level but stable in the product.
+Andy Settings runs as the 8th embedded .NET service inside the Conductor macOS app.
+
+| Property | Value |
+|----------|-------|
+| Port | 9107 |
+| Proxy prefix | `/settings` |
+| Database | SQLite at `~/Library/Application Support/ai.rivoli.conductor/db/andy-settings.sqlite` |
+| Service config | `SettingsServiceConfig` in `Conductor/Core/ServiceHost/Services/` |
+
+Integration points in Conductor:
+
+1. **ServiceOrchestrator** launches andy-settings after auth + rbac (same as other services)
+2. **UnifiedProxy** routes `/settings/*` requests to port 9107
+3. **SettingsService** protocol in Swift calls the API via `APIClient`
+4. **ActionBus** integration: `UpdateSettingsAction` for audit trail
+5. **AppPreferences** (UserDefaults) remains for UI chrome; andy-settings handles all service/team/user configuration
+
+Consumer services (containers, code-index, devpilot, docs) read their settings from andy-settings at startup and optionally subscribe for live updates.
 
 ## Storage Model
 
@@ -294,245 +197,104 @@ This should be configurable at the framework level but stable in the product.
 
 #### `setting_definitions`
 
-- `id`
-- `key`
-- `application_code`
-- `service_code`
-- `display_name`
-- `description`
-- `category`
-- `data_type`
-- `default_value_json`
-- `validation_json`
-- `ui_schema_json`
-- `is_secret`
-- `allowed_scopes_json`
-- `tags_json`
-- `is_deprecated`
-- `created_at`
-- `updated_at`
+- `id`, `key`, `application_code`, `display_name`, `description`, `category`
+- `data_type`, `default_value_json`, `validation_json`, `ui_schema_json`
+- `is_secret`, `allowed_scopes_json`, `tags_json`, `is_deprecated`
+- `created_at`, `updated_at`
 
 #### `setting_assignments`
 
-- `id`
-- `definition_id`
-- `scope_type`
-- `scope_id`
-- `subject_type`
-- `subject_id`
-- `value_json`
-- `etag`
-- `version`
-- `updated_by`
-- `updated_at`
+- `id`, `definition_id`, `scope_type`, `scope_id`
+- `value_json`, `etag`, `version`
+- `updated_by`, `updated_at`
 
-#### `secret_references`
+#### `encrypted_secrets`
 
-- `id`
-- `definition_id`
-- `scope_type`
-- `scope_id`
-- `subject_type`
-- `subject_id`
-- `backend_kind`
-- `secret_handle`
-- `updated_by`
-- `updated_at`
+- `id`, `definition_id`, `scope_type`, `scope_id`
+- `encrypted_value` (Data Protection API)
+- `updated_by`, `updated_at`
 
 #### `audit_events`
 
-- `id`
-- `event_type`
-- `definition_key`
-- `scope_type`
-- `scope_id`
-- `actor_type`
-- `actor_id`
-- `before_json`
-- `after_json`
-- `correlation_id`
-- `created_at`
-
-#### `service_registrations`
-
-- `id`
-- `application_code`
-- `service_code`
-- `display_name`
-- `capabilities_json`
-- `health_status`
-- `last_seen_at`
+- `id`, `event_type`, `definition_key`, `scope_type`, `scope_id`
+- `actor_type`, `actor_id`
+- `before_json`, `after_json` (secrets excluded)
+- `correlation_id`, `created_at`
 
 ## API Architecture
 
 ### REST Endpoints
 
-Suggested resource groups:
+- `/api/definitions` -- setting definition CRUD
+- `/api/values` -- scoped assignment CRUD
+- `/api/effective` -- resolve effective values for a context
+- `/api/secrets` -- encrypted secret set/rotate/delete
+- `/api/audit` -- change history queries
+- `/api/import` -- bulk import with preview
+- `/api/export` -- bulk export with scope/app filters
+- `/api/health` -- health probes
 
-- `/api/definitions`
-- `/api/values`
-- `/api/effective`
-- `/api/secrets`
-- `/api/audit`
-- `/api/import`
-- `/api/export`
-- `/api/services`
-- `/api/health`
+### MCP Tools
 
-### gRPC Services
+MCP tools map directly to the domain model:
 
-Suggested services:
+- `settings_list_definitions` -- browse definitions by app/category
+- `settings_get_effective` -- resolve effective value for a key + context
+- `settings_set_value` -- set scoped value (with auth)
+- `settings_explain` -- explain why a value is active
+- `settings_audit` -- recent change history
+- `settings_search` -- search definitions by keyword
 
-- `DefinitionsService`
-- `ValuesService`
-- `ResolutionService`
-- `AuditService`
-- `SecretsService`
-- `ServiceRegistryService`
+### Swagger / OpenAPI
 
-### MCP Tooling
+Swagger UI at `/swagger` (development only). Full OpenAPI spec with JWT security definition.
 
-The MCP layer should map directly to the domain model and not invent a parallel settings abstraction.
-
-Example tool groups:
-
-- definition discovery
-- effective resolution
-- scoped value inspection
-- authorized mutation
-- audit lookup
-- troubleshooting / explanation
-
-## Authentication and Authorization Flow
+## Authentication and Authorization
 
 ### Authentication
 
-- Web UI uses OIDC with Andy Auth.
-- CLI supports browser-based sign-in or device-code style flow.
-- API accepts bearer tokens.
-- Local bootstrap mode may be enabled for first-run localhost setup.
+- Web UI: OIDC with Andy Auth
+- CLI: OAuth Device Flow
+- API: JWT Bearer tokens
+- Conductor: tokens forwarded through UnifiedProxy
+- Embedded mode: local bootstrap for first-run (localhost-only, auto-disabled after setup)
 
 ### Authorization
 
-Authorization is enforced per operation via Andy RBAC.
+Andy RBAC with application code `settings`. All access is RBAC-gated -- users only see settings they are authorized to view.
 
-Examples:
+Permissions:
 
-- read definition
-- write definition
-- read effective values
-- write scoped values
-- rotate secret
-- read audit
-- administer team scopes
+- `definition:read` / `definition:write` / `definition:delete`
+- `value:read` / `value:write` / `value:delete`
+- `secret:read` / `secret:write`
+- `audit:read`
+- `import:write` / `export:read`
 
-## Runtime Update Model
+Scope-aware checks:
 
-Two consumer modes are supported.
-
-### Snapshot Mode
-
-- resolve on startup
-- bind to strongly typed options
-- good for stable infrastructure settings
-
-### Subscription Mode
-
-- live update channel via SignalR or Server-Sent Events
-- optional in-memory cache
-- good for dynamic flags and non-critical runtime settings
+- Users can only read/write their own user-scoped settings
+- Team admins can mutate team-scoped values for their team only
+- Secret reads require explicit `secret:read` permission
+- All mutations are audited
 
 ## Deployment Modes
 
-### Local Desktop Mode
+### Embedded (Conductor)
 
-- API runs on localhost
-- Angular UI runs locally or is served by API
-- SQLite local database
-- Keychain-backed secrets
-- service consumers run on the same machine
+- API runs inside Conductor's ServiceOrchestrator
+- SQLite database in `~/Library/Application Support/`
+- No separate container needed
+- Consumer services access via UnifiedProxy at `localhost:9100/settings`
 
-### Local Containerized Dev Mode
+### Docker Compose (Development)
 
-- Docker Compose starts API, UI, and optional PostgreSQL
-- useful for repo contributors and integration testing
-- mirrors Andy Containers style local dev workflow
+- API container + PostgreSQL container
+- Angular dev server proxied
+- Corporate cert support via `certs/` directory
 
-### Shared Team Mode
+### Hosted (Production)
 
-- API in container
-- PostgreSQL database
-- centrally accessible UI
-- team/user scopes authoritative
-
-## Repo Layout
-
-Suggested repo layout:
-
-```text
-andy-settings/
-├── .github/
-├── docs/
-├── openapi/
-├── proto/
-├── scripts/
-├── src/
-│   ├── Andy.Settings/
-│   ├── Andy.Settings.Abstractions/
-│   ├── Andy.Settings.Api/
-│   ├── Andy.Settings.Client/
-│   ├── Andy.Settings.AspNetCore/
-│   ├── Andy.Settings.EntityFramework/
-│   ├── Andy.Settings.Secrets.Keychain/
-│   ├── Andy.Settings.Cli/
-│   └── Andy.Settings.Mcp/
-├── tests/
-│   ├── Andy.Settings.Tests/
-│   ├── Andy.Settings.Api.Tests/
-│   ├── Andy.Settings.Client.Tests/
-│   ├── Andy.Settings.IntegrationTests/
-│   └── Andy.Settings.Mcp.Tests/
-├── client/
-│   └── andy-settings-web/
-├── certs/
-├── config/
-├── docker-compose.yml
-├── Dockerfile.api
-├── Dockerfile.web
-└── Andy.Settings.sln
-```
-
-## Key Design Decisions
-
-### Why SQLite first?
-
-- ideal for local desktop mode
-- low operational overhead
-- excellent for local-first bootstrapping
-- easy testability
-
-### Why PostgreSQL later?
-
-- aligns with broader Andy backend patterns
-- supports shared/team deployments
-- supports audit-heavy workloads and flexible querying
-
-### Why typed definitions instead of only key/value?
-
-- better validation
-- better UX generation
-- safer migrations
-- better compatibility with strongly typed .NET options
-
-### Why separate secrets?
-
-- minimizes accidental exposure
-- supports OS-native secure storage
-- allows future secret backend replacement
-
-### Why put CLI and MCP in the same repo?
-
-- shared contracts and behavior
-- consistent authn/authz
-- easier release coordination
-- same operational story as the API and UI
+- API in container with PostgreSQL
+- Angular SPA served from wwwroot or separate nginx container
+- External Andy Auth and Andy RBAC

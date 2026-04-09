@@ -1,20 +1,21 @@
-# Andy Settings — Implementation Plan
+# Implementation Plan
 
-## Implementation Strategy
+## Strategy
 
-Implement Andy Settings in vertical slices so the product is usable early in local desktop mode and naturally evolves into a team-capable shared service.
+Implement Andy Settings in vertical slices so the product is usable early in embedded mode (Conductor) and naturally evolves into a shared team service.
 
 Recommended sequence:
 
-1. core domain and persistence
-2. API and typed resolution
-3. .NET options integration
+1. Core domain and persistence (SQLite first)
+2. API, typed resolution, and Swagger
+3. Auth and RBAC integration
 4. Angular web client
 5. CLI
 6. MCP server
-7. auth/rbac hardening
-8. import/export and audit refinements
+7. Import/export and audit refinements
+8. Conductor integration
 9. PostgreSQL shared-mode support
+10. Examples and documentation
 
 ## Technology Stack
 
@@ -22,295 +23,100 @@ Recommended sequence:
 
 - .NET 8
 - ASP.NET Core
-- EF Core
-- SQLite (initial)
-- PostgreSQL (shared mode)
-- OpenAPI / Swagger
-- gRPC
-- SignalR or SSE for live updates
+- Entity Framework Core 8
+- SQLite (embedded/Conductor mode)
+- PostgreSQL (shared/team mode)
+- Swagger / OpenAPI (Swashbuckle)
+- Serilog (structured logging)
+- ASP.NET Core Data Protection (secret encryption)
 
 ### Frontend
 
-- Angular
-- npm-based workflow
-- component library and auth patterns aligned with Andy UI approach
-- OIDC/OAuth2 client integration
+- Angular 18 (standalone components)
+- SCSS
+- angular-auth-oidc-client
+- Proxy to backend API
 
 ### Security / Identity
 
-- Andy Auth for authentication
-- Andy RBAC for authorization
-- macOS Keychain for local secret storage
+- Andy Auth (OAuth 2.0 / OIDC)
+- Andy RBAC (authorization)
+- Data Protection API for secret encryption
 
 ### Tooling
 
-- Docker
-- Docker Compose
+- Docker / Docker Compose
+- MkDocs Material (documentation)
+- xUnit / FluentAssertions / Moq
 - GitHub Actions
-- xUnit / FluentAssertions / integration test stack
 
 ## Solution Structure
 
-Suggested solution/projects:
-
 ```text
 src/
-  Andy.Settings/
-  Andy.Settings.Abstractions/
-  Andy.Settings.Api/
-  Andy.Settings.Client/
-  Andy.Settings.AspNetCore/
-  Andy.Settings.EntityFramework/
-  Andy.Settings.Secrets.Keychain/
-  Andy.Settings.Cli/
-  Andy.Settings.Mcp/
+  Andy.Settings.Domain/            # Entities, enums
+  Andy.Settings.Application/       # Interfaces, DTOs, options, validation
+  Andy.Settings.Infrastructure/    # EF Core, repositories, services, telemetry
+  Andy.Settings.Api/               # REST controllers, MCP tools, Program.cs
+  Andy.Settings.Shared/            # Shared types for external consumers
+
+tools/
+  Andy.Settings.Cli/               # CLI tool (System.CommandLine + Spectre.Console)
 
 tests/
-  Andy.Settings.Tests/
-  Andy.Settings.Api.Tests/
-  Andy.Settings.Client.Tests/
-  Andy.Settings.IntegrationTests/
-  Andy.Settings.Mcp.Tests/
+  Andy.Settings.Tests.Unit/        # Unit tests
+  Andy.Settings.Tests.Integration/ # Integration tests (WebApplicationFactory)
 
-client/
-  andy-settings-web/
+client/                            # Angular 18 SPA
+examples/                          # Multi-language API/MCP examples
+docs/                              # MkDocs documentation
 ```
 
-## Backend Projects
-
-### `Andy.Settings.Abstractions`
-
-Contains:
-
-- core interfaces
-- DTO contracts
-- scope models
-- setting definition models
-- resolution result models
-- audit abstractions
-- secret store abstractions
-
-Should have no infrastructure dependencies.
-
-### `Andy.Settings`
-
-Contains:
-
-- resolution engine
-- validation logic
-- definition registry services
-- mutation orchestration
-- audit event creation
-- import/export orchestration
-
-### `Andy.Settings.EntityFramework`
-
-Contains:
-
-- EF Core DbContext
-- entity mappings
-- repository implementations
-- migrations
-- SQLite and PostgreSQL provider support
-
-### `Andy.Settings.Secrets.Keychain`
-
-Contains:
-
-- Keychain secret store implementation
-- local secret reference creation
-- retrieval/rotation logic
-- test doubles for non-macOS environments
-
-### `Andy.Settings.Client`
-
-Contains:
-
-- REST client
-- gRPC client wrappers
-- auth token integration hooks
-- convenience APIs for resolution and mutation
-
-### `Andy.Settings.AspNetCore`
-
-Contains:
-
-- DI registration helpers
-- `AddAndySettingsClient(...)`
-- configuration provider bridge
-- typed options binding helpers
-- live-refresh background integration
-
-### `Andy.Settings.Api`
-
-Contains:
-
-- REST controllers or minimal APIs
-- gRPC services
-- OpenAPI generation
-- authn/authz integration
-- health checks
-- optional SignalR hub or SSE endpoints
-
-### `Andy.Settings.Cli`
-
-Contains:
-
-- command parsing
-- auth flows
-- JSON/table output
-- shared client SDK usage
-- import/export commands
-- secret mutation commands
-
-### `Andy.Settings.Mcp`
-
-Contains:
-
-- MCP server host
-- tool definitions
-- auth/token acquisition strategy
-- mapping from tools to application services
-
-## Frontend Implementation
-
-## Angular App
-
-Suggested app structure:
-
-```text
-client/andy-settings-web/
-  src/app/
-    core/
-    features/
-      definitions/
-      values/
-      effective/
-      secrets/
-      audit/
-      services/
-      import-export/
-    shared/
-```
-
-Feature areas:
-
-- settings definitions list/detail
-- settings values editor
-- effective value explorer
-- audit log explorer
-- secret rotation UI
-- service registry UI
-- import/export UI
-
-## UI Components
-
-Needed component set:
-
-- settings search bar
-- category tree
-- scope picker
-- actor/context header
-- type-aware editors
-- secret editor
-- value resolution panel
-- audit timeline
-- validation summary panel
-- diff panel
-
-## Backend Domain Interfaces
-
-Suggested interfaces:
+## Domain Interfaces
 
 ```csharp
-public interface ISettingDefinitionRegistry
+public interface IDefinitionService
 {
-    Task RegisterAsync(SettingDefinition definition, CancellationToken ct = default);
     Task<SettingDefinition?> GetAsync(string key, CancellationToken ct = default);
-    Task<IReadOnlyList<SettingDefinition>> SearchAsync(DefinitionQuery query, CancellationToken ct = default);
+    Task<PagedResult<SettingDefinition>> SearchAsync(DefinitionQuery query, CancellationToken ct = default);
+    Task<SettingDefinition> CreateAsync(CreateDefinitionDto dto, CancellationToken ct = default);
+    Task UpdateAsync(string key, UpdateDefinitionDto dto, CancellationToken ct = default);
+    Task DeleteAsync(string key, CancellationToken ct = default);
 }
 
-public interface ISettingsResolver
+public interface IResolutionService
 {
-    Task<ResolvedSetting> ResolveAsync(string key, SettingsContext context, CancellationToken ct = default);
-    Task<IReadOnlyList<ResolvedSetting>> ResolveManyAsync(IEnumerable<string> keys, SettingsContext context, CancellationToken ct = default);
+    Task<ResolvedSetting> ResolveAsync(string key, ResolutionContext context, CancellationToken ct = default);
+    Task<IReadOnlyList<ResolvedSetting>> ResolveManyAsync(IEnumerable<string> keys, ResolutionContext context, CancellationToken ct = default);
 }
 
-public interface ISettingsWriter
+public interface IAssignmentService
 {
-    Task SetAsync(SettingMutation mutation, CancellationToken ct = default);
-    Task DeleteAsync(SettingDeleteCommand command, CancellationToken ct = default);
+    Task SetAsync(SetValueDto dto, CancellationToken ct = default);
+    Task DeleteAsync(DeleteValueDto dto, CancellationToken ct = default);
 }
 
-public interface ISecretStore
+public interface ISecretService
 {
-    Task<SecretReference> PutAsync(SecretWriteCommand command, CancellationToken ct = default);
-    Task<SecretPayload?> GetAsync(SecretReadCommand command, CancellationToken ct = default);
-    Task RotateAsync(SecretRotateCommand command, CancellationToken ct = default);
+    Task SetSecretAsync(SetSecretDto dto, CancellationToken ct = default);
+    Task<string?> GetSecretAsync(GetSecretDto dto, CancellationToken ct = default);
+    Task RotateSecretAsync(RotateSecretDto dto, CancellationToken ct = default);
+}
+
+public interface IAuditService
+{
+    Task<PagedResult<AuditEvent>> QueryAsync(AuditQuery query, CancellationToken ct = default);
+}
+
+public interface IExportImportService
+{
+    Task<ExportResult> ExportAsync(ExportOptions options, CancellationToken ct = default);
+    Task<ImportPreview> PreviewImportAsync(Stream data, CancellationToken ct = default);
+    Task<ImportResult> ImportAsync(Stream data, ImportOptions options, CancellationToken ct = default);
 }
 ```
 
-## Database Implementation Notes
-
-### EF Core Entities
-
-Implement separate entities for:
-
-- definitions
-- assignments
-- secret references
-- audit events
-- service registrations
-
-### Concurrency
-
-Use optimistic concurrency for setting assignments.
-
-Suggested fields:
-
-- `version`
-- `etag`
-- rowversion equivalent where supported
-
-### Migrations
-
-- keep EF migrations under source control
-- support SQLite-specific and PostgreSQL-compatible migrations
-- initial migration should target local-first mode first
-
-## Resolution Engine Implementation
-
-### Algorithm
-
-For a given key and context:
-
-1. load setting definition
-2. determine allowed scopes
-3. query all matching assignments ordered by precedence
-4. apply precedence rules
-5. validate resolved value against definition
-6. attach explanation metadata
-7. return resolved object
-
-### Explanation Model
-
-Each resolution result should include:
-
-- requested key
-- resolved value
-- winning scope
-- source chain
-- overridden entries
-- validation outcome
-- timestamp metadata
-
-This is important for API, CLI, MCP, and UI parity.
-
-## API Implementation Details
-
-### REST Routes
-
-Suggested initial routes:
+## REST Routes
 
 ```text
 GET    /api/definitions
@@ -319,199 +125,109 @@ POST   /api/definitions
 PUT    /api/definitions/{key}
 DELETE /api/definitions/{key}
 
-GET    /api/values/{key}
-POST   /api/values/{key}
-DELETE /api/values/{key}
+GET    /api/values?definitionKey={key}&scopeType={scope}&scopeId={id}
+POST   /api/values
+DELETE /api/values/{id}
 
 POST   /api/effective/resolve
 POST   /api/effective/resolve-batch
+POST   /api/effective/explain
 
-POST   /api/secrets/{key}
-POST   /api/secrets/{key}/rotate
-DELETE /api/secrets/{key}
+POST   /api/secrets/{definitionKey}
+POST   /api/secrets/{definitionKey}/rotate
+DELETE /api/secrets/{definitionKey}
 
 GET    /api/audit
 GET    /api/audit/{id}
 
 POST   /api/import
+POST   /api/import/preview
 GET    /api/export
+
+GET    /api/health
 ```
-
-### gRPC Services
-
-Define protobuf contracts for:
-
-- list/search definitions
-- get/set/delete assignments
-- resolve effective values
-- list audit entries
-- register services
-
-Keep protobufs in `proto/` so other services can consume them directly.
-
-## CLI Implementation Details
-
-Suggested command groups:
-
-- `auth`
-- `definitions`
-- `values`
-- `effective`
-- `secrets`
-- `audit`
-- `services`
-- `import`
-- `export`
-- `bootstrap`
-
-Example:
-
-```bash
-andy-settings bootstrap init
-andy-settings auth login
-andy-settings definitions search --app andy-codeindex
-andy-settings values set andy.docs.defaultSource filesystem --scope machine
-andy-settings effective get andy.auth.authority --user alice@example.com
-andy-settings secrets rotate andy.llm.openai.apiKey --scope user
-```
-
-## MCP Implementation Details
-
-### Server Host
-
-Build the MCP server as a .NET host using the shared client/domain services.
-
-### Tool Design
-
-Tools should be explicit, typed, and policy-aware.
-
-Examples:
-
-- `settings_search_definitions`
-- `settings_get_effective_value`
-- `settings_set_scoped_value`
-- `settings_explain_value_resolution`
-- `settings_get_audit_events`
-
-### Safety Controls
-
-- mutation tools must validate authorization
-- secret reads must be explicitly permission-gated
-- destructive changes should require explicit parameters
-
-## Auth and RBAC Implementation
-
-### Andy Auth
-
-Implement:
-
-- bearer token validation in API
-- SPA login for Angular app
-- CLI login flow compatible with public clients
-- local bootstrap bypass for localhost-only first run
-
-### Andy RBAC
-
-Implement policy checks in the application layer, not just controllers.
-
-Examples:
-
-- definition writes require `andy-settings:definition:write`
-- value writes require `andy-settings:value:write`
-- secret reads require `andy-settings:secret:read`
-- team mutations require `andy-settings:team:admin`
-
-## Docker Implementation
-
-### Containers
-
-Provide at least:
-
-- API container
-- Web container
-- optional PostgreSQL container
-
-### Local Dev Compose
-
-Compose should support:
-
-- API
-- Web
-- PostgreSQL
-- optional Auth dependency
-- optional RBAC dependency
-
-For purely local-first mode, API can run with SQLite and Keychain access outside full containerized production-like flows.
 
 ## Implementation Phases
 
-### Phase 1 — Core Local MVP
+### Phase 1 -- Core Domain and Persistence
 
-- definitions
-- assignments
-- SQLite persistence
-- resolution engine
-- REST API
-- basic Angular app
-- local bootstrap
+- Domain entities and enums
+- Application interfaces and DTOs
+- EF Core DbContext with dual provider support (SQLite + PostgreSQL)
+- Initial migration
+- Repository implementations
+- Resolution engine with scope precedence
+- Validation service
+- Data seeder
 
-### Phase 2 — .NET Integration + CLI
+### Phase 2 -- API Layer
 
-- `Andy.Settings.Client`
-- `Andy.Settings.AspNetCore`
-- `IOptions<T>` bridge
-- CLI support
-- import/export
+- Program.cs with full middleware pipeline
+- DefinitionsController
+- ValuesController
+- EffectiveController (resolution + explanation)
+- SecretsController (encrypted secrets)
+- AuditController
+- ImportExportController
+- Health endpoint
+- Swagger configuration
 
-### Phase 3 — MCP + Live Refresh
+### Phase 3 -- Auth and RBAC
 
-- MCP server
-- SignalR/SSE refresh pipeline
-- richer diagnostics and explanation
+- Andy Auth JWT Bearer integration
+- Andy RBAC client with permission checks
+- Development fallback (AllowAllDevPolicyProvider)
+- Scope-aware authorization (user can only access own user-scoped settings)
+- MCP OAuth protected resource metadata
 
-### Phase 4 — Auth/RBAC Hardening
+### Phase 4 -- Frontend
 
-- full OIDC login flows
-- RBAC-backed authorization checks
-- team-scope operations
-- audit refinement
+- Auth service with OIDC
+- Layout and navigation (matching Andy ecosystem style)
+- Definitions browser
+- Values editor (type-aware, scope-aware)
+- Effective value explorer with explanation
+- Secret editor (masked, RBAC-gated reveal)
+- Audit timeline
+- Import/export views
 
-### Phase 5 — Shared Deployment Mode
+### Phase 5 -- CLI
 
-- PostgreSQL provider
-- remote deployment model
-- sync/export improvements
+- Auth commands (login, logout)
+- Definition commands (list, search)
+- Value commands (get, set, delete, explain)
+- Export/import commands
+- Table and JSON output via Spectre.Console
 
-## Definition Bootstrapping
+### Phase 6 -- MCP
 
-Ship seed definitions for:
+- MCP tools implementation
+- OAuth metadata endpoints
+- CORS for MCP clients
 
-- `andy.auth.*`
-- `andy.rbac.*`
-- `andy.containers.*`
-- `andy.codeindex.*`
-- `andy.devpilot.*`
-- `andy.docs.*`
-- `andy.host.*`
+### Phase 7 -- Conductor Integration
 
-These seed definitions should be loaded through startup registration or migration seeding.
+- Verify SQLite embedded mode works end-to-end
+- Document Conductor `SettingsServiceConfig` setup
+- Seed definitions for all Andy services
+- Test with Conductor's ServiceOrchestrator and UnifiedProxy
 
-## Backward Compatibility Strategy
+### Phase 8 -- Polish
 
-- allow services to continue using `appsettings.json` during migration
-- add an Andy Settings configuration provider that overlays or replaces static configuration
-- migrate service-by-service rather than big-bang replacement
+- OpenTelemetry instrumentation
+- Examples in 6 languages
+- MkDocs documentation
+- Docker optimization
+- PostgreSQL shared-mode verification
 
-## Deliverables
+## Seed Definitions
 
-Initial repo deliverables should include:
+Ship seed definitions for all Andy services:
 
-- working .NET 8 solution
-- API container
-- Angular web client
-- CLI tool
-- MCP server
-- Docker Compose local development workflow
-- seed definitions
-- integration tests
-- OpenAPI and protobuf contracts
+- `andy.auth.*` -- authority, audience, token lifetimes
+- `andy.rbac.*` -- API base URL, application codes, cache TTL
+- `andy.containers.*` -- default provider, resource limits, template paths
+- `andy.codeindex.*` -- embedding provider, model, chunk sizes
+- `andy.devpilot.*` -- LLM provider, model, agent settings
+- `andy.docs.*` -- source paths, rendering options
+- `andy.settings.*` -- self-configuration (meta settings)

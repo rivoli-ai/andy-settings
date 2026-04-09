@@ -1,73 +1,35 @@
-# Andy Settings — Features
+# Features
 
 ## Overview
 
-Andy Settings is the configuration control plane for the Andy ecosystem. It provides a local-first, schema-driven, policy-aware configuration system for desktop applications and backend services, with a path from single-user local development on macOS to shared, team-scoped, remotely managed deployments.
-
-The system is designed for:
-
-- Andy DevPilot
-- Andy Code Index
-- Andy Docs
-- Andy Containers
-- Andy Auth integration (OAuth 2.0 / OIDC)
-- Andy RBAC integration (authorization and scoped administration)
-- local macOS application settings
-- local and remote service settings
-- CLI and MCP access patterns used across the broader Andy backend portfolio
+Andy Settings is the configuration control plane for the Andy ecosystem. It provides a schema-driven, policy-aware configuration system for the Conductor macOS app and Andy backend services, with a path from single-user embedded operation to shared team deployments.
 
 ## Product Goals
 
 - Provide a single source of truth for configuration across Andy services.
-- Support local-only operation on a Mac without requiring cloud infrastructure.
+- Run embedded inside Conductor on macOS without requiring external infrastructure.
 - Expose the same settings through API, CLI, MCP, and Web UI.
-- Support typed settings, validation, inheritance, auditability, and secrets.
+- Support typed settings, validation, scope inheritance, auditability, and encrypted secrets.
 - Make user-, team-, application-, and service-scoped configuration first-class.
-- Preserve compatibility with .NET configuration patterns and Angular clients.
+- Integrate with Andy Auth and Andy RBAC for authentication and authorization.
 
-## Core Feature Set
+## Core Features
 
-### 1. Local-First Configuration Store
+### 1. Typed Configuration Definitions
 
-- SQLite-backed configuration store for local development and local desktop deployments.
-- Optional PostgreSQL backend for shared/team deployments later.
-- Full local operation without requiring distributed coordination.
-- File-backed bootstrap configuration for first-run setup.
+Strongly typed setting definitions with:
 
-### 2. Typed Configuration Definitions
+- Supported types: string, integer, decimal, boolean, enum, duration, URI, JSON object, string list, secret
+- Validation rules per definition (JSON schema)
+- Required/optional semantics
+- Default values
+- UI metadata for automatic form generation
+- Tags and categories for organization
+- Deprecation metadata
 
-- Strongly typed setting definitions.
-- Supported types:
-  - string
-  - integer
-  - decimal
-  - boolean
-  - enum
-  - duration
-  - URI
-  - JSON object
-  - string list
-  - secret reference
-- Validation rules per definition.
-- Required/optional semantics.
-- Default values.
-- UI metadata for form generation.
+### 2. Scoped Configuration Resolution
 
-### 3. Scoped Configuration Resolution
-
-Supported scopes:
-
-- machine
-- application
-- service
-- user
-- team
-- workspace
-- session/runtime override
-
-Resolution order is deterministic and explainable.
-
-Example precedence:
+Settings can be assigned at multiple scopes with deterministic precedence:
 
 1. built-in default
 2. machine
@@ -78,248 +40,143 @@ Example precedence:
 7. workspace
 8. runtime override
 
-### 4. Effective Value Calculation
+The resolution engine returns effective values with full explanation metadata -- "why is this value active?" is a first-class query.
 
-- Resolve effective settings for a given context.
-- Return:
-  - resolved value
-  - winning scope
-  - overridden values
-  - validation status
-  - last updated metadata
-- Support “why is this the active value?” UX in API and UI.
+### 3. Encrypted Secrets
 
-### 5. Configuration Definitions Registry
+Secret-bearing settings are encrypted using ASP.NET Core Data Protection API (AES-256-GCM):
 
-- Central registry of setting definitions.
-- Discoverable by application, service, category, and tag.
-- Supports versioned evolution of definitions.
-- Allows services to register definitions at startup or via migration.
+- Encrypted at rest in the database
+- Only decrypted for users with `secret:read` RBAC permission
+- Masked in list views, exports, and audit logs
+- Rotation support without exposing prior values
+- All secret access is audited
 
-### 6. Secrets Handling
+### 4. Conductor Integration
 
-- Separate secret metadata from general configuration values.
-- Use macOS Keychain for local secret material in local-first mode.
-- Keep secret references in the main settings store.
-- Support future remote secret backends.
-- Masked retrieval and rotation workflows.
+Andy Settings runs as the 8th embedded .NET service inside Conductor:
 
-### 7. .NET 8 Configuration Integration
+- Port 9107, proxy prefix `/settings`
+- SQLite backend at `~/Library/Application Support/ai.rivoli.conductor/db/`
+- Consumer services (auth, rbac, containers, code-index, devpilot, docs) read configuration from andy-settings
+- Conductor's ActionBus integration for audit trail
+- AppPreferences (UserDefaults) remains for UI chrome only
 
-- Integrates with `IConfiguration`.
-- Supports `IOptions<T>`, `IOptionsSnapshot<T>`, and `IOptionsMonitor<T>`.
-- Bridges Andy Settings to `Andy.Configuration` style strongly typed options.
-- Startup validation and runtime refresh support.
+### 5. REST API
 
-### 8. REST API
+- Setting definition CRUD
+- Scoped assignment CRUD
+- Effective value resolution with explanation
+- Encrypted secret set/rotate/delete
+- Audit history lookup
+- Bulk import/export with preview
+- Health and readiness probes
+- Swagger/OpenAPI documentation
 
-Primary API capabilities:
+### 6. MCP Support
 
-- setting definition CRUD
-- setting assignment CRUD
-- effective settings resolution
-- bulk reads/writes
-- secret set/rotate/delete
-- audit history lookup
-- health and readiness
-- import/export
-- service registration
+Model Context Protocol tools for AI assistants:
 
-### 9. gRPC API
+- `settings_list_definitions` -- browse by app/category
+- `settings_get_effective` -- resolve effective value
+- `settings_set_value` -- set scoped value with auth
+- `settings_explain` -- explain resolution chain
+- `settings_audit` -- recent change history
+- `settings_search` -- search definitions
 
-gRPC endpoints for backend and agent-style consumers.
+### 7. CLI
 
-Use cases:
-
-- high-performance resolution
-- batch reads
-- bulk writes
-- local desktop integration
-- local service communication
-- future sync agent integration
-
-### 10. MCP Support
-
-Andy Settings exposes a Model Context Protocol interface for AI assistants and tool hosts.
-
-Supported MCP capabilities:
-
-- browse setting definitions
-- resolve effective settings for a service or user context
-- inspect scopes and inheritance
-- modify allowed settings with authorization checks
-- rotate secrets where policy allows
-- explain why a value is active
-- export diagnostics for troubleshooting
-
-Example MCP tool concepts:
-
-- `settings.list_definitions`
-- `settings.get_effective`
-- `settings.get_value`
-- `settings.set_value`
-- `settings.delete_value`
-- `settings.list_scopes`
-- `settings.explain_resolution`
-- `settings.list_audit_events`
-
-### 11. CLI Support
-
-Andy Settings includes a first-party CLI in the same repo.
-
-CLI capabilities:
-
-- login / auth integration
-- local bootstrap
-- list definitions
-- get effective values
-- set values per scope
-- bulk import/export
-- secret rotation
-- audit history queries
-- environment/profile switching
-- JSON and table output
-
-Example commands:
+First-party CLI in the same repo:
 
 ```bash
-andy-settings login
+andy-settings auth login
 andy-settings definitions list --app andy-containers
 andy-settings get andy.containers.defaultProvider --scope user
 andy-settings set andy.codeindex.embedding.provider openai --scope team --team platform
 andy-settings explain andy.auth.authority --user alice@example.com
 andy-settings export --format json > settings-export.json
+andy-settings import settings.json --preview
 ```
 
-### 12. Angular Web Front-End
+### 8. Angular Web Front-End
 
-- Angular web client in the same repo.
-- Shared identity and authorization patterns aligned with the broader Andy UI approach.
-- Form-driven editing generated from setting definitions.
-- Scope-aware editing.
-- Secret-specific workflows.
-- Audit and diff views.
-- Responsive layout for desktop-class browser usage.
+- Form-driven editing generated from setting definitions
+- Scope-aware editing with visual scope chain
+- Secret masking with RBAC-gated reveal
+- Audit timeline and diff views
+- Environment comparison (side-by-side)
+- Responsive layout matching Andy Containers / Code Index style
 
-### 13. Authorization via Andy RBAC
+### 9. Authentication via Andy Auth
 
-Permissions are enforced for:
+- OAuth 2.0 / OIDC integration
+- Embedded bootstrap mode for Conductor first-run (localhost-only)
+- PKCE public client support for Angular and CLI
+- JWT Bearer token API access
 
-- read definitions
-- write definitions
-- read values
-- write values
-- read secrets
-- write secrets
-- administer team settings
-- view audit
-- manage imports/exports
+### 10. Authorization via Andy RBAC
 
-Suggested permission namespace:
+All access is RBAC-gated -- users only see settings they are authorized to view.
 
-- `andy-settings:definition:read`
-- `andy-settings:definition:write`
-- `andy-settings:value:read`
-- `andy-settings:value:write`
-- `andy-settings:secret:read`
-- `andy-settings:secret:write`
-- `andy-settings:audit:read`
-- `andy-settings:team:admin`
-- `andy-settings:sync:admin`
+Permissions:
 
-### 14. Authentication via Andy Auth
+- `definition:read` / `definition:write` / `definition:delete`
+- `value:read` / `value:write` / `value:delete`
+- `secret:read` / `secret:write`
+- `audit:read`
+- `import:write` / `export:read`
 
-- OAuth 2.0 / OIDC integration.
-- Local bootstrap mode for first-run setup.
-- PKCE-friendly public client support for Angular and CLI flows.
-- Token-based API access for web, CLI, and MCP-adjacent consumers.
+Scope-aware enforcement: users can only access their own user-scoped settings, team admins manage team settings, etc.
 
-### 15. Audit and Change History
+### 11. Audit and Change History
 
-- Append-only history of setting changes.
-- Who changed what, when, and at which scope.
-- Before/after metadata.
-- Secret changes log metadata without exposing secret payloads.
-- API and UI views for audit history.
+- Append-only history of all setting changes
+- Who changed what, when, and at which scope
+- Before/after metadata (secrets excluded from payload)
+- API, CLI, and UI views for audit history
+- Filterable by date range, actor, action type
 
-### 16. Import / Export
+### 12. Import / Export
 
-- JSON export of definitions and/or values.
-- Selective export by app, service, scope, or team.
-- Import with validation and dry-run mode.
-- Good fit for migration, backup, and environment promotion.
+- JSON and YAML export with scope/app/environment filters
+- Import with validation and dry-run preview mode
+- Diff view showing additions, modifications, deletions before applying
+- Suitable for migration, backup, and environment promotion
 
-### 17. Service Registration
+### 13. Multi-App / Multi-Service Support
 
-Services can register:
+Serves all Andy services from one configuration authority:
 
-- service code
-- supported configuration domains
-- setting definitions
-- desired refresh behavior
-- health status
-- sync capabilities
+- `andy.auth.*`
+- `andy.rbac.*`
+- `andy.containers.*`
+- `andy.codeindex.*`
+- `andy.devpilot.*`
+- `andy.docs.*`
+- `andy.settings.*`
 
-### 18. Runtime Refresh
+### 14. Multi-Language Examples
 
-Two supported consumption models:
+The `examples/` directory demonstrates API and MCP consumption from:
 
-- startup snapshot
-- live refresh / subscription
+- C# (.NET)
+- Python
+- JavaScript / TypeScript
+- Go
+- Rust
+- PowerShell
 
-Suitable for:
+### 15. OpenTelemetry
 
-- feature flags
-- LLM provider switching
-- polling intervals
-- runtime limits
-- UI preferences
-
-### 19. Multi-App / Multi-Service Support
-
-The system is designed to serve multiple Andy services from one configuration authority.
-
-Examples:
-
-- `andy-auth.*`
-- `andy-rbac.*`
-- `andy-containers.*`
-- `andy-codeindex.*`
-- `andy-devpilot.*`
-- `andy-docs.*`
-- `andy-host.*`
-
-### 20. Local Desktop Host Settings
-
-Specific support for the macOS host application:
-
-- local app settings
-- startup preferences
-- update channels
-- theme and UX preferences
-- local service endpoints
-- local paths and workspace folders
-- provider credentials references
+- Tracing with custom ActivitySource
+- Metrics: resolution count/latency, mutation count, secret rotation count
+- OTLP exporter for production, console exporter for development
+- ASP.NET Core + EF Core + HTTP client instrumentation
 
 ## Non-Goals (Initial Release)
 
-- Multi-datacenter consensus or distributed coordination.
-- Complex policy engines beyond RBAC and definition validation.
-- General-purpose secret-management replacement.
-- Kubernetes-first delivery as the primary initial deployment target.
-
-## Initial MVP
-
-The MVP should include:
-
-- .NET 8 API
-- SQLite persistence
-- macOS Keychain secret backend
-- Angular web client
-- CLI
-- MCP server support
-- REST and gRPC APIs
-- OIDC integration with Andy Auth
-- RBAC integration with Andy RBAC
-- typed definitions and scoped resolution
-- Docker / Docker Compose local development workflow
+- Multi-datacenter consensus or distributed coordination
+- Complex policy engines beyond RBAC and definition validation
+- General-purpose secret management replacement (use dedicated vaults for production secrets)
+- gRPC API (may be added later if needed for performance)
+- SignalR/SSE live refresh (may be added later)
