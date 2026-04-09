@@ -1,0 +1,40 @@
+## .NET
+bin/
+obj/
+*.user
+*.suo
+*.sln.docstates
+*.userprefs
+.vs/
+*.DotSettings.user
+
+## Node / Angular
+client/node_modules/
+client/dist/
+client/.angular/
+
+## IDE
+.idea/
+.vscode/
+
+## OS
+.DS_Store
+Thumbs.db
+
+## Docker
+tmp/
+
+## Certificates
+certs/*.crt
+certs/*.pem
+certs/*.key
+certs/*.pfx
+!certs/README.md
+!certs/.gitignore
+
+## Local packages
+local-packages/*.nupkg
+
+## Environment
+.env
+*.env.local

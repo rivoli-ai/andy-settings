@@ -1,0 +1,11 @@
+.git
+.vs
+.vscode
+.idea
+bin
+obj
+tmp
+**/node_modules
+**/.angular
+*.md
+!README.md
