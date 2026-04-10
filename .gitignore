@@ -38,3 +38,4 @@ local-packages/*.nupkg
 ## Environment
 .env
 *.env.local
+site/

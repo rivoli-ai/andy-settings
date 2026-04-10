@@ -40,6 +40,7 @@ nav:
   - Implementation: implementation.md
   - Testing: testing.md
   - Stories: stories.md
+  - Conductor: conductor-integration.md
   - Examples:
     - Overview: examples.md
 

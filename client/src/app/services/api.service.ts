@@ -78,6 +78,15 @@ export class ApiService {
     return this.http.get(`${this.baseUrl}/export`, { params: httpParams });
   }
 
+  // Import
+  importPreview(data: any): Observable<any> {
+    return this.http.post(`${this.baseUrl}/import/preview`, data);
+  }
+
+  importSettings(data: any): Observable<any> {
+    return this.http.post(`${this.baseUrl}/import`, data);
+  }
+
   // Health
   getHealth(): Observable<any> {
     return this.http.get('/health');
