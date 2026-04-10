@@ -392,4 +392,107 @@ public class SettingsMcpTools
             return JsonSerializer.Serialize(new { error = ex.Message }, JsonOptions);
         }
     }
+
+    [McpServerTool(Name = "settings_rotate_secret")]
+    [Description("Rotate an encrypted secret value for a setting definition")]
+    public async Task<string> RotateSecret(
+        string definitionKey,
+        string scopeType,
+        string? scopeId = null,
+        string newValue = "")
+    {
+        try
+        {
+            if (!Enum.TryParse<ScopeType>(scopeType, ignoreCase: true, out var parsedScope))
+                return JsonSerializer.Serialize(new { error = $"Invalid scopeType '{scopeType}'. Valid values: {string.Join(", ", Enum.GetNames<ScopeType>())}" }, JsonOptions);
+
+            var dto = new RotateSecretDto
+            {
+                DefinitionKey = definitionKey,
+                ScopeType = parsedScope,
+                ScopeId = scopeId,
+                NewPlaintextValue = newValue,
+            };
+            var result = await _secrets.RotateSecretAsync(dto, actorId: null);
+            return JsonSerializer.Serialize(result, JsonOptions);
+        }
+        catch (Exception ex)
+        {
+            return JsonSerializer.Serialize(new { error = ex.Message }, JsonOptions);
+        }
+    }
+
+    [McpServerTool(Name = "settings_delete_secret")]
+    [Description("Delete a secret by its definition key")]
+    public async Task<string> DeleteSecret(string definitionKey)
+    {
+        try
+        {
+            await _secrets.DeleteSecretAsync(definitionKey);
+            return JsonSerializer.Serialize(new { success = true, message = $"Secret for definition '{definitionKey}' deleted." }, JsonOptions);
+        }
+        catch (Exception ex)
+        {
+            return JsonSerializer.Serialize(new { error = ex.Message }, JsonOptions);
+        }
+    }
+
+    [McpServerTool(Name = "settings_resolve_batch")]
+    [Description("Resolve multiple setting keys at once, returning effective values for the given context")]
+    public async Task<string> ResolveBatch(
+        string keys,
+        string? applicationCode = null,
+        string? userId = null,
+        string? teamId = null)
+    {
+        try
+        {
+            var keyList = keys.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            var context = new ResolutionContext
+            {
+                ApplicationCode = applicationCode,
+                UserId = userId,
+                TeamId = teamId,
+            };
+            var result = await _resolution.ResolveBatchAsync(keyList, context);
+            return JsonSerializer.Serialize(result, JsonOptions);
+        }
+        catch (Exception ex)
+        {
+            return JsonSerializer.Serialize(new { error = ex.Message }, JsonOptions);
+        }
+    }
+
+    [McpServerTool(Name = "settings_import")]
+    [Description("Import settings from JSON data")]
+    public async Task<string> Import(string jsonData)
+    {
+        try
+        {
+            using var stream = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(jsonData));
+            var options = new ImportOptions();
+            var result = await _exportImport.ImportAsync(stream, options, null);
+            return JsonSerializer.Serialize(result, JsonOptions);
+        }
+        catch (Exception ex)
+        {
+            return JsonSerializer.Serialize(new { error = ex.Message }, JsonOptions);
+        }
+    }
+
+    [McpServerTool(Name = "settings_import_preview")]
+    [Description("Preview what an import would change without applying it")]
+    public async Task<string> ImportPreview(string jsonData)
+    {
+        try
+        {
+            using var stream = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(jsonData));
+            var result = await _exportImport.PreviewImportAsync(stream);
+            return JsonSerializer.Serialize(result, JsonOptions);
+        }
+        catch (Exception ex)
+        {
+            return JsonSerializer.Serialize(new { error = ex.Message }, JsonOptions);
+        }
+    }
 }

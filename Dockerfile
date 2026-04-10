@@ -15,8 +15,8 @@ RUN find /tmp/certs/ -name '.git*' -delete 2>/dev/null || true && \
 
 ENV NODE_EXTRA_CA_CERTS=/etc/ssl/certs/ca-certificates.crt
 
-COPY client/package.json client/package-lock.json ./
-RUN npm ci
+COPY client/package.json client/package-lock.json* ./
+RUN npm install
 COPY client/ ./
 RUN npx ng build --configuration docker
 
@@ -48,6 +48,7 @@ ENV SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt \
 
 COPY Directory.Build.props ./
 COPY nuget.config ./
+COPY local-packages/ ./local-packages/
 COPY src/Andy.Settings.Api/Andy.Settings.Api.csproj src/Andy.Settings.Api/
 COPY src/Andy.Settings.Application/Andy.Settings.Application.csproj src/Andy.Settings.Application/
 COPY src/Andy.Settings.Domain/Andy.Settings.Domain.csproj src/Andy.Settings.Domain/
