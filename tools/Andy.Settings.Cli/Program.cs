@@ -23,10 +23,18 @@ rootCommand.AddCommand(AuthCommands.Build());
 // Definition commands (definitions list, definitions search)
 rootCommand.AddCommand(DefinitionCommands.Build(apiUrlOption, formatOption));
 
-// Value commands (get, set, explain)
+// Value commands (get, set, explain, delete, values list)
 rootCommand.AddCommand(ValueCommands.BuildGetCommand(apiUrlOption, formatOption));
 rootCommand.AddCommand(ValueCommands.BuildSetCommand(apiUrlOption));
 rootCommand.AddCommand(ValueCommands.BuildExplainCommand(apiUrlOption, formatOption));
+rootCommand.AddCommand(ValueCommands.BuildDeleteCommand(apiUrlOption));
+rootCommand.AddCommand(ValueCommands.BuildListCommand(apiUrlOption, formatOption));
+
+// Secret commands (secrets set, get, rotate, delete)
+rootCommand.AddCommand(SecretCommands.Build(apiUrlOption));
+
+// Audit commands (audit)
+rootCommand.AddCommand(AuditCommands.Build(apiUrlOption, formatOption));
 
 // Export / Import commands
 rootCommand.AddCommand(ExportImportCommands.BuildExportCommand(apiUrlOption));

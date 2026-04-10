@@ -19,6 +19,7 @@ public class SettingsMcpToolsTests
     private readonly Mock<IAssignmentService> _assignmentService = new();
     private readonly Mock<IAuditService> _auditService = new();
     private readonly Mock<IExportImportService> _exportImportService = new();
+    private readonly Mock<ISecretService> _secretService = new();
     private readonly SettingsMcpTools _sut;
 
     public SettingsMcpToolsTests()
@@ -28,7 +29,8 @@ public class SettingsMcpToolsTests
             _resolutionService.Object,
             _assignmentService.Object,
             _auditService.Object,
-            _exportImportService.Object);
+            _exportImportService.Object,
+            _secretService.Object);
     }
 
     [Fact]
