@@ -1,17 +1,35 @@
 using System.CommandLine;
+using Andy.Settings.Cli.Commands;
 
 var rootCommand = new RootCommand("Andy Settings CLI - Manage application settings and configuration");
 
+// Global options
 var apiUrlOption = new Option<string>(
     "--api-url",
     getDefaultValue: () => "https://localhost:5300",
     description: "The Andy Settings API base URL");
 rootCommand.AddGlobalOption(apiUrlOption);
 
-// TODO: Add command groups (see stories for implementation order)
-// - auth (login, logout)
-// - settings (list, get, set, delete, history)
-// - environments (list, create, delete)
-// - export / import
+var formatOption = new Option<string>(
+    "--format",
+    getDefaultValue: () => "table",
+    description: "Output format (table or json)");
+formatOption.FromAmong("table", "json");
+rootCommand.AddGlobalOption(formatOption);
+
+// Auth commands (auth login, auth logout)
+rootCommand.AddCommand(AuthCommands.Build());
+
+// Definition commands (definitions list, definitions search)
+rootCommand.AddCommand(DefinitionCommands.Build(apiUrlOption, formatOption));
+
+// Value commands (get, set, explain)
+rootCommand.AddCommand(ValueCommands.BuildGetCommand(apiUrlOption, formatOption));
+rootCommand.AddCommand(ValueCommands.BuildSetCommand(apiUrlOption));
+rootCommand.AddCommand(ValueCommands.BuildExplainCommand(apiUrlOption, formatOption));
+
+// Export / Import commands
+rootCommand.AddCommand(ExportImportCommands.BuildExportCommand(apiUrlOption));
+rootCommand.AddCommand(ExportImportCommands.BuildImportCommand(apiUrlOption));
 
 return await rootCommand.InvokeAsync(args);

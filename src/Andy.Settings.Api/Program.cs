@@ -52,6 +52,11 @@ builder.Services.AddScoped<IValidationService, ValidationService>();
 builder.Services.AddScoped<IExportImportService, ExportImportService>();
 builder.Services.AddScoped<DataSeeder>();
 
+// ── MCP Server ─────────────────────────────────────────────────────────────
+builder.Services.AddMcpServer()
+    .WithHttpTransport()
+    .WithToolsFromAssembly();
+
 // ── Authentication (Andy Auth) ──────────────────────────────────────────────
 if (!string.IsNullOrEmpty(andyAuthAuthority))
 {
@@ -242,6 +247,8 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+
+app.MapMcp("/mcp").RequireCors("AllowMcpClients");
 
 // ── MCP OAuth well-known endpoints ──────────────────────────────────────────
 if (!string.IsNullOrEmpty(andyAuthAuthority))
