@@ -1,18 +1,30 @@
 using System.Text.Json.Serialization;
 using Andy.Settings.Api.Data;
+using Andy.Settings.Api.Services;
 using Andy.Settings.Application.Interfaces;
 using Andy.Settings.Infrastructure.Data;
 using Andy.Settings.Infrastructure.Repositories;
 using Andy.Settings.Infrastructure.Services;
 using Andy.Settings.Infrastructure.Telemetry;
+using Andy.Rbac.Client;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Microsoft.OpenApi.Models;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// ── Server URLs for MCP metadata ────────────────────────────────────────────
+var configuredUrl = builder.Configuration["Urls"]?.Split(';').FirstOrDefault();
+var serverUrl = configuredUrl != null && !configuredUrl.Contains("://+:") && !configuredUrl.Contains("://0.0.0.0:")
+    ? configuredUrl
+    : "https://localhost:5300";
+var protectedResourceUrl = $"{serverUrl}/mcp";
+var andyAuthAuthority = builder.Configuration["AndyAuth:Authority"] ?? "";
 
 // ── JSON options ────────────────────────────────────────────────────────────
 builder.Services.AddControllers()
@@ -29,19 +41,60 @@ builder.Services.AddSettingsDbContext(builder.Configuration);
 builder.Services.AddDataProtection();
 
 // ── Application services ────────────────────────────────────────────────────
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 builder.Services.AddScoped<IDefinitionService, DefinitionRepository>();
 builder.Services.AddScoped<IAuditService, AuditRepository>();
 builder.Services.AddScoped<IAssignmentService, AssignmentRepository>();
 builder.Services.AddScoped<IResolutionService, ResolutionService>();
 builder.Services.AddScoped<ISecretService, SecretService>();
 builder.Services.AddScoped<IValidationService, ValidationService>();
+builder.Services.AddScoped<IExportImportService, ExportImportService>();
 builder.Services.AddScoped<DataSeeder>();
 
-// ── Authentication ──────────────────────────────────────────────────────────
-// Story #18 will add Andy Auth JWT Bearer here.
-// For now, development mode allows all requests.
-if (builder.Environment.IsDevelopment())
+// ── Authentication (Andy Auth) ──────────────────────────────────────────────
+if (!string.IsNullOrEmpty(andyAuthAuthority))
 {
+    var audience = builder.Configuration["AndyAuth:Audience"] ?? "urn:andy-settings-api";
+    builder.Services.AddAuthentication("Bearer")
+        .AddJwtBearer("Bearer", options =>
+        {
+            options.Authority = andyAuthAuthority;
+            options.Audience = audience;
+            options.RequireHttpsMetadata = !builder.Environment.IsDevelopment();
+            if (builder.Environment.IsDevelopment())
+            {
+                options.BackchannelHttpHandler = new HttpClientHandler
+                {
+                    ServerCertificateCustomValidationCallback =
+                        HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
+                };
+                options.TokenValidationParameters.ValidIssuers = new[]
+                {
+                    andyAuthAuthority, andyAuthAuthority.TrimEnd('/') + "/",
+                    "https://localhost:5001", "https://localhost:5001/"
+                };
+            }
+        });
+    builder.Services.AddAuthorization();
+
+    // MCP OAuth Protected Resource Metadata (RFC 8707)
+    builder.Services.AddAuthentication()
+        .AddMcp(mcpOptions =>
+        {
+            mcpOptions.ResourceMetadataUri = new Uri($"{serverUrl}/mcp/.well-known/oauth-protected-resource");
+            mcpOptions.ResourceMetadata = new()
+            {
+                Resource = new Uri(protectedResourceUrl),
+                ResourceDocumentation = new Uri("https://github.com/rivoli-ai/andy-settings"),
+                AuthorizationServers = { new Uri(andyAuthAuthority) },
+                ScopesSupported = ["openid", "profile", "email"],
+            };
+        });
+}
+else
+{
+    // Dev fallback: no auth enforcement for local development
     builder.Services.AddAuthentication();
     builder.Services.AddAuthorization(options =>
     {
@@ -49,6 +102,36 @@ if (builder.Environment.IsDevelopment())
             .RequireAssertion(_ => true)
             .Build();
     });
+}
+
+// ── RBAC (Andy.Rbac.Client) ─────────────────────────────────────────────────
+var rbacBaseUrl = builder.Configuration["Rbac:ApiBaseUrl"];
+if (!string.IsNullOrEmpty(rbacBaseUrl))
+{
+    if (builder.Environment.IsDevelopment())
+    {
+        builder.Services.ConfigureHttpClientDefaults(b =>
+            b.ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+            {
+                ServerCertificateCustomValidationCallback =
+                    HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
+            }));
+    }
+
+    builder.Services.AddRbacClient(options =>
+    {
+        options.ApiBaseUrl = rbacBaseUrl;
+        options.ApplicationCode = "settings";
+    });
+
+    if (builder.Environment.IsDevelopment())
+    {
+        builder.Services.AddSingleton<IAuthorizationPolicyProvider>(sp =>
+        {
+            var opts = sp.GetRequiredService<IOptions<AuthorizationOptions>>();
+            return new AllowAllDevPolicyProvider(opts);
+        });
+    }
 }
 
 // ── Swagger / OpenAPI ───────────────────────────────────────────────────────
@@ -100,11 +183,11 @@ builder.Services.AddCors(options =>
 });
 
 // ── OpenTelemetry ───────────────────────────────────────────────────────────
-var serviceName = builder.Configuration.GetValue<string>("OpenTelemetry:ServiceName") ?? SettingsTelemetry.ServiceName;
+var otelServiceName = builder.Configuration.GetValue<string>("OpenTelemetry:ServiceName") ?? SettingsTelemetry.ServiceName;
 var otlpEndpoint = builder.Configuration.GetValue<string>("OpenTelemetry:OtlpEndpoint");
 
 builder.Services.AddOpenTelemetry()
-    .ConfigureResource(r => r.AddService(serviceName))
+    .ConfigureResource(r => r.AddService(otelServiceName))
     .WithTracing(tracing =>
     {
         tracing
@@ -131,14 +214,10 @@ builder.Services.AddOpenTelemetry()
             metrics.AddConsoleExporter();
     });
 
-// ── Serilog ─────────────────────────────────────────────────────────────────
-// Story #11 calls for Serilog; using built-in logging for now.
-// builder.Host.UseSerilog((ctx, cfg) => cfg.ReadFrom.Configuration(ctx.Configuration));
-
 // ═════════════════════════════════════════════════════════════════════════════
 var app = builder.Build();
 
-// ── Development-only middleware ──────────────────────────────────────────────
+// ── Development-only startup ────────────────────────────────────────────────
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -164,9 +243,59 @@ app.UseAuthorization();
 
 app.MapControllers();
 
+// ── MCP OAuth well-known endpoints ──────────────────────────────────────────
+if (!string.IsNullOrEmpty(andyAuthAuthority))
+{
+    var oauthMetadataJsonOptions = new System.Text.Json.JsonSerializerOptions
+    {
+        PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.SnakeCaseLower,
+        DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
+    };
+
+    app.MapGet("/.well-known/oauth-protected-resource", (IServiceProvider sp) =>
+    {
+        var optionsMonitor = sp.GetRequiredService<Microsoft.Extensions.Options.IOptionsMonitor<
+            ModelContextProtocol.AspNetCore.Authentication.McpAuthenticationOptions>>();
+        var options = optionsMonitor.Get(
+            ModelContextProtocol.AspNetCore.Authentication.McpAuthenticationDefaults.AuthenticationScheme);
+        return Results.Json(options.ResourceMetadata, oauthMetadataJsonOptions);
+    }).AllowAnonymous().RequireCors("AllowMcpClients");
+
+    app.MapGet("/mcp/.well-known/oauth-protected-resource", (IServiceProvider sp) =>
+    {
+        var optionsMonitor = sp.GetRequiredService<Microsoft.Extensions.Options.IOptionsMonitor<
+            ModelContextProtocol.AspNetCore.Authentication.McpAuthenticationOptions>>();
+        var options = optionsMonitor.Get(
+            ModelContextProtocol.AspNetCore.Authentication.McpAuthenticationDefaults.AuthenticationScheme);
+        return Results.Json(options.ResourceMetadata, oauthMetadataJsonOptions);
+    }).AllowAnonymous().RequireCors("AllowMcpClients");
+
+    app.MapGet("/.well-known/openid-configuration", () =>
+        Results.Redirect($"{andyAuthAuthority}/.well-known/openid-configuration", permanent: false))
+        .AllowAnonymous().RequireCors("AllowMcpClients");
+
+    app.MapGet("/.well-known/oauth-authorization-server", () =>
+        Results.Redirect($"{andyAuthAuthority}/.well-known/openid-configuration", permanent: false))
+        .AllowAnonymous().RequireCors("AllowMcpClients");
+
+    app.MapGet("/authorize", (HttpContext ctx) =>
+    {
+        var qs = ctx.Request.QueryString.HasValue ? ctx.Request.QueryString.Value : string.Empty;
+        return Results.Redirect($"{andyAuthAuthority}/connect/authorize{qs}", permanent: false);
+    }).AllowAnonymous().RequireCors("AllowMcpClients");
+
+    app.MapPost("/token", (HttpContext ctx) =>
+    {
+        var qs = ctx.Request.QueryString.HasValue ? ctx.Request.QueryString.Value : string.Empty;
+        ctx.Response.StatusCode = StatusCodes.Status307TemporaryRedirect;
+        ctx.Response.Headers.Location = $"{andyAuthAuthority}/connect/token{qs}";
+        return Task.CompletedTask;
+    }).AllowAnonymous().RequireCors("AllowMcpClients");
+}
+
 // ── Health endpoint ─────────────────────────────────────────────────────────
 app.MapGet("/health", () => Results.Ok(new { status = "healthy", timestamp = DateTimeOffset.UtcNow }))
-    .ExcludeFromDescription();
+    .AllowAnonymous().ExcludeFromDescription();
 
 // ── SPA fallback ────────────────────────────────────────────────────────────
 app.MapFallbackToFile("index.html");
@@ -175,3 +304,22 @@ app.Run();
 
 // Required for WebApplicationFactory in integration tests
 public partial class Program { }
+
+/// <summary>
+/// Bypasses RBAC permission checks in development.
+/// </summary>
+internal class AllowAllDevPolicyProvider : DefaultAuthorizationPolicyProvider
+{
+    private static readonly AuthorizationPolicy AllowAll = new AuthorizationPolicyBuilder()
+        .RequireAssertion(_ => true)
+        .Build();
+
+    public AllowAllDevPolicyProvider(IOptions<AuthorizationOptions> options)
+        : base(options) { }
+
+    public override Task<AuthorizationPolicy?> GetPolicyAsync(string policyName)
+        => Task.FromResult<AuthorizationPolicy?>(AllowAll);
+
+    public new Task<AuthorizationPolicy> GetDefaultPolicyAsync()
+        => Task.FromResult(AllowAll);
+}

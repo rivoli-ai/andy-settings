@@ -33,7 +33,7 @@ public class AuditRepository : IAuditService
 
         var totalCount = await q.CountAsync(ct);
         var items = await q
-            .OrderByDescending(e => e.CreatedAt)
+            .OrderByDescending(e => e.Id)
             .Skip((query.Page - 1) * query.PageSize)
             .Take(query.PageSize)
             .ToListAsync(ct);
