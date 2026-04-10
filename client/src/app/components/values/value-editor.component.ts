@@ -8,227 +8,94 @@ import { ApiService } from '../../services/api.service';
   standalone: true,
   imports: [CommonModule, FormsModule],
   template: `
-    <div class="value-editor">
-      <h1>Value Editor</h1>
+    <div class="p-6">
+      <h1 class="page-header">Value Editor</h1>
 
-      <div class="key-selector">
-        <label>Definition Key</label>
-        <div class="key-input-row">
+      <div class="mb-6 relative">
+        <label class="form-label">Definition Key</label>
+        <div class="flex gap-2">
           <input
             type="text"
-            class="key-input"
+            class="form-input"
             placeholder="Search or select a definition key..."
             [(ngModel)]="keySearch"
             (ngModelChange)="onKeySearchChange()"
             (focus)="showSuggestions = true"
           />
         </div>
-        <ul class="suggestions" *ngIf="showSuggestions && filteredKeys.length > 0">
-          <li *ngFor="let k of filteredKeys" (click)="selectKey(k)">{{ k }}</li>
+        <ul *ngIf="showSuggestions && filteredKeys.length > 0"
+            class="absolute z-10 left-0 right-0 max-h-[200px] overflow-y-auto bg-white border border-surface-200 rounded-b shadow-lg list-none m-0 p-0">
+          <li *ngFor="let k of filteredKeys"
+              (click)="selectKey(k)"
+              class="px-3 py-2 text-sm font-mono cursor-pointer hover:bg-surface-50 hover:text-primary-500">
+            {{ k }}
+          </li>
         </ul>
       </div>
 
-      <div *ngIf="selectedKey" class="assignments-section">
-        <h2>Assignments for <span class="key-highlight">{{ selectedKey }}</span></h2>
+      <div *ngIf="selectedKey" class="mt-2">
+        <h2 class="text-lg font-semibold text-surface-900 mb-4">
+          Assignments for <span class="text-primary-500 font-mono">{{ selectedKey }}</span>
+        </h2>
 
-        <div class="table-container" *ngIf="assignments.length > 0">
-          <table>
-            <thead>
+        <div class="table-wrapper mb-6" *ngIf="assignments.length > 0">
+          <table class="min-w-full divide-y divide-surface-200 bg-white border border-surface-200 rounded-lg">
+            <thead class="bg-surface-50">
               <tr>
-                <th>Scope Type</th>
-                <th>Scope ID</th>
-                <th>Value</th>
-                <th>Version</th>
-                <th>Actions</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-surface-500 uppercase tracking-wider">Scope Type</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-surface-500 uppercase tracking-wider">Scope ID</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-surface-500 uppercase tracking-wider">Value</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-surface-500 uppercase tracking-wider">Version</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-surface-500 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
-            <tbody>
-              <tr *ngFor="let a of assignments">
-                <td><span class="scope-badge">{{ a.scopeType }}</span></td>
-                <td>{{ a.scopeId || '(global)' }}</td>
-                <td class="value-cell">{{ a.value }}</td>
-                <td>{{ a.version }}</td>
-                <td>
-                  <button class="btn-delete" (click)="deleteAssignment(a.id)">Delete</button>
+            <tbody class="divide-y divide-surface-200">
+              <tr *ngFor="let a of assignments" class="hover:bg-surface-50">
+                <td class="px-4 py-3 text-sm"><span class="badge badge-info">{{ a.scopeType }}</span></td>
+                <td class="px-4 py-3 text-sm">{{ a.scopeId || '(global)' }}</td>
+                <td class="px-4 py-3 text-sm font-mono">{{ a.value }}</td>
+                <td class="px-4 py-3 text-sm">{{ a.version }}</td>
+                <td class="px-4 py-3 text-sm">
+                  <button class="btn-danger btn-sm" (click)="deleteAssignment(a.id)">Delete</button>
                 </td>
               </tr>
             </tbody>
           </table>
         </div>
-        <p class="empty-msg" *ngIf="assignments.length === 0">No assignments found for this key.</p>
+        <p class="text-sm text-surface-400 italic" *ngIf="assignments.length === 0">No assignments found for this key.</p>
 
-        <div class="form-section">
-          <h3>{{ editMode ? 'Edit' : 'Add' }} Assignment</h3>
-          <div class="form-grid">
-            <div class="form-group">
-              <label>Scope Type</label>
-              <select [(ngModel)]="form.scopeType">
-                <option value="">-- Select --</option>
-                <option *ngFor="let st of scopeTypes" [value]="st">{{ st }}</option>
-              </select>
+        <div class="card mt-6">
+          <div class="card-body">
+            <h3 class="text-base font-semibold text-surface-700 mb-3">{{ editMode ? 'Edit' : 'Add' }} Assignment</h3>
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+              <div>
+                <label class="form-label">Scope Type</label>
+                <select class="form-select" [(ngModel)]="form.scopeType">
+                  <option value="">-- Select --</option>
+                  <option *ngFor="let st of scopeTypes" [value]="st">{{ st }}</option>
+                </select>
+              </div>
+              <div>
+                <label class="form-label">Scope ID</label>
+                <input type="text" class="form-input" [(ngModel)]="form.scopeId" placeholder="e.g. user-123" />
+              </div>
+              <div>
+                <label class="form-label">Value</label>
+                <input type="text" class="form-input" [(ngModel)]="form.value" placeholder="Setting value" />
+              </div>
             </div>
-            <div class="form-group">
-              <label>Scope ID</label>
-              <input type="text" [(ngModel)]="form.scopeId" placeholder="e.g. user-123" />
+            <div class="flex items-center gap-3">
+              <button class="btn-primary" (click)="saveAssignment()" [disabled]="!form.scopeType || !form.value">
+                Save Assignment
+              </button>
+              <span class="text-sm text-green-600" *ngIf="successMsg">{{ successMsg }}</span>
+              <span class="text-sm text-red-500" *ngIf="errorMsg">{{ errorMsg }}</span>
             </div>
-            <div class="form-group">
-              <label>Value</label>
-              <input type="text" [(ngModel)]="form.value" placeholder="Setting value" />
-            </div>
-          </div>
-          <div class="form-actions">
-            <button class="btn" (click)="saveAssignment()" [disabled]="!form.scopeType || !form.value">
-              Save Assignment
-            </button>
-            <span class="status-msg success" *ngIf="successMsg">{{ successMsg }}</span>
-            <span class="status-msg error" *ngIf="errorMsg">{{ errorMsg }}</span>
           </div>
         </div>
       </div>
     </div>
-  `,
-  styles: [`
-    .value-editor { padding: 24px; }
-    h1 { margin: 0 0 20px; font-size: 24px; color: #333; }
-    h2 { margin: 0 0 16px; font-size: 18px; color: #333; }
-    h2 .key-highlight { color: #6c63ff; font-family: monospace; }
-    h3 { margin: 0 0 12px; font-size: 16px; color: #555; }
-    .key-selector { margin-bottom: 24px; position: relative; }
-    .key-selector > label {
-      display: block;
-      margin-bottom: 6px;
-      font-size: 13px;
-      font-weight: 600;
-      color: #555;
-    }
-    .key-input-row { display: flex; gap: 8px; }
-    .key-input {
-      flex: 1;
-      padding: 8px 12px;
-      border: 1px solid #ddd;
-      border-radius: 4px;
-      font-size: 14px;
-    }
-    .key-input:focus { outline: none; border-color: #6c63ff; }
-    .suggestions {
-      position: absolute;
-      top: 100%;
-      left: 0;
-      right: 0;
-      max-height: 200px;
-      overflow-y: auto;
-      background: #fff;
-      border: 1px solid #ddd;
-      border-radius: 0 0 4px 4px;
-      list-style: none;
-      margin: 0;
-      padding: 0;
-      z-index: 10;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-    }
-    .suggestions li {
-      padding: 8px 12px;
-      font-size: 14px;
-      cursor: pointer;
-      font-family: monospace;
-    }
-    .suggestions li:hover { background: #f5f5ff; color: #6c63ff; }
-    .table-container { overflow-x: auto; margin-bottom: 24px; }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      background: #fff;
-      border: 1px solid #e0e0e0;
-    }
-    thead th {
-      text-align: left;
-      padding: 10px 14px;
-      background: #f8f8fc;
-      border-bottom: 2px solid #e0e0e0;
-      font-size: 13px;
-      color: #555;
-      font-weight: 600;
-    }
-    tbody td {
-      padding: 10px 14px;
-      border-bottom: 1px solid #f0f0f0;
-      font-size: 14px;
-      color: #333;
-    }
-    tbody tr:hover { background: #f5f5ff; }
-    .scope-badge {
-      display: inline-block;
-      padding: 2px 8px;
-      background: #eeeeff;
-      color: #6c63ff;
-      border-radius: 10px;
-      font-size: 12px;
-    }
-    .value-cell { font-family: monospace; }
-    .btn-delete {
-      padding: 4px 10px;
-      background: #fff;
-      color: #d44;
-      border: 1px solid #d44;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 12px;
-    }
-    .btn-delete:hover { background: #fff0f0; }
-    .empty-msg { color: #888; font-size: 14px; font-style: italic; }
-    .form-section {
-      background: #f8f8fc;
-      border: 1px solid #e0e0e0;
-      border-radius: 6px;
-      padding: 20px;
-    }
-    .form-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-      gap: 16px;
-      margin-bottom: 16px;
-    }
-    .form-group {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-    }
-    .form-group label {
-      font-size: 12px;
-      font-weight: 600;
-      color: #555;
-      text-transform: uppercase;
-    }
-    .form-group input,
-    .form-group select {
-      padding: 8px 12px;
-      border: 1px solid #ddd;
-      border-radius: 4px;
-      font-size: 14px;
-    }
-    .form-group input:focus,
-    .form-group select:focus { outline: none; border-color: #6c63ff; }
-    .form-actions {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-    .btn {
-      padding: 8px 20px;
-      background: #6c63ff;
-      color: #fff;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 14px;
-    }
-    .btn:hover { background: #5a52e0; }
-    .btn:disabled { background: #ccc; cursor: not-allowed; }
-    .status-msg { font-size: 13px; }
-    .status-msg.success { color: #2a9d2a; }
-    .status-msg.error { color: #d44; }
-    .assignments-section { margin-top: 8px; }
-  `]
+  `
 })
 export class ValueEditorComponent implements OnInit {
   allKeys: string[] = [];

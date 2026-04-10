@@ -8,31 +8,15 @@ import { TopbarComponent } from './components/layout/topbar.component';
   standalone: true,
   imports: [RouterOutlet, SidebarComponent, TopbarComponent],
   template: `
-    <div class="app-layout">
+    <div class="flex min-h-screen">
       <app-sidebar />
-      <div class="app-main">
+      <div class="flex-1 flex flex-col bg-surface-50">
         <app-topbar />
-        <div class="app-content">
+        <div class="flex-1 overflow-y-auto">
           <router-outlet />
         </div>
       </div>
     </div>
-  `,
-  styles: [`
-    .app-layout {
-      display: flex;
-      min-height: 100vh;
-    }
-    .app-main {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      background: #f5f5f8;
-    }
-    .app-content {
-      flex: 1;
-      overflow-y: auto;
-    }
-  `]
+  `
 })
 export class AppComponent {}

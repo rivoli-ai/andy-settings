@@ -8,233 +8,104 @@ import { ApiService } from '../../services/api.service';
   standalone: true,
   imports: [CommonModule, FormsModule],
   template: `
-    <div class="effective-explorer">
-      <h1>Effective Value Explorer</h1>
+    <div class="p-6">
+      <h1 class="page-header">Effective Value Explorer</h1>
 
-      <div class="form-card">
-        <div class="form-grid">
-          <div class="form-group full-width">
-            <label>Key</label>
-            <input type="text" [(ngModel)]="key" placeholder="e.g. my-app:feature-flag" />
+      <div class="card mb-6">
+        <div class="card-body">
+          <div class="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+            <div class="col-span-2 lg:col-span-3">
+              <label class="form-label">Key</label>
+              <input type="text" class="form-input" [(ngModel)]="key" placeholder="e.g. my-app:feature-flag" />
+            </div>
+            <div>
+              <label class="form-label">User ID</label>
+              <input type="text" class="form-input" [(ngModel)]="context.userId" placeholder="user-123" />
+            </div>
+            <div>
+              <label class="form-label">Team ID</label>
+              <input type="text" class="form-input" [(ngModel)]="context.teamId" placeholder="team-abc" />
+            </div>
+            <div>
+              <label class="form-label">Workspace ID</label>
+              <input type="text" class="form-input" [(ngModel)]="context.workspaceId" placeholder="ws-456" />
+            </div>
+            <div>
+              <label class="form-label">Application Code</label>
+              <input type="text" class="form-input" [(ngModel)]="context.applicationCode" placeholder="my-app" />
+            </div>
+            <div>
+              <label class="form-label">Service Code</label>
+              <input type="text" class="form-input" [(ngModel)]="context.serviceCode" placeholder="svc-001" />
+            </div>
           </div>
-          <div class="form-group">
-            <label>User ID</label>
-            <input type="text" [(ngModel)]="context.userId" placeholder="user-123" />
+          <div class="flex gap-3">
+            <button class="btn-primary" (click)="resolve()" [disabled]="!key">Resolve</button>
+            <button class="btn-secondary" (click)="explain()" [disabled]="!key">Explain</button>
           </div>
-          <div class="form-group">
-            <label>Team ID</label>
-            <input type="text" [(ngModel)]="context.teamId" placeholder="team-abc" />
-          </div>
-          <div class="form-group">
-            <label>Workspace ID</label>
-            <input type="text" [(ngModel)]="context.workspaceId" placeholder="ws-456" />
-          </div>
-          <div class="form-group">
-            <label>Application Code</label>
-            <input type="text" [(ngModel)]="context.applicationCode" placeholder="my-app" />
-          </div>
-          <div class="form-group">
-            <label>Service Code</label>
-            <input type="text" [(ngModel)]="context.serviceCode" placeholder="svc-001" />
-          </div>
-        </div>
-        <div class="form-actions">
-          <button class="btn" (click)="resolve()" [disabled]="!key">Resolve</button>
-          <button class="btn btn-outline" (click)="explain()" [disabled]="!key">Explain</button>
-        </div>
-      </div>
-
-      <div class="result-card" *ngIf="result">
-        <h2>Result</h2>
-        <div class="result-grid">
-          <div class="result-item">
-            <label>Key</label>
-            <span class="mono">{{ result.key }}</span>
-          </div>
-          <div class="result-item">
-            <label>Effective Value</label>
-            <span class="value-display">{{ result.effectiveValue ?? '(null)' }}</span>
-          </div>
-          <div class="result-item">
-            <label>Winning Scope</label>
-            <span class="scope-badge">{{ result.winningScopeType || 'Default' }}</span>
-          </div>
-          <div class="result-item">
-            <label>Is Default</label>
-            <span [class.default-yes]="result.isDefault" [class.default-no]="!result.isDefault">
-              {{ result.isDefault ? 'Yes' : 'No' }}
-            </span>
-          </div>
-        </div>
-
-        <div class="source-chain" *ngIf="result.sourceChain && result.sourceChain.length > 0">
-          <h3>Source Chain</h3>
-          <table>
-            <thead>
-              <tr>
-                <th></th>
-                <th>Scope Type</th>
-                <th>Scope ID</th>
-                <th>Value</th>
-                <th>Priority</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr *ngFor="let link of result.sourceChain" [class.winner]="link.isWinner">
-                <td>
-                  <span class="winner-icon" *ngIf="link.isWinner">&#9733;</span>
-                </td>
-                <td><span class="scope-badge">{{ link.scopeType }}</span></td>
-                <td>{{ link.scopeId || '(global)' }}</td>
-                <td class="mono">{{ link.value ?? '(not set)' }}</td>
-                <td>{{ link.priority }}</td>
-              </tr>
-            </tbody>
-          </table>
         </div>
       </div>
 
-      <div class="error-card" *ngIf="errorMsg">
+      <div class="card" *ngIf="result">
+        <div class="card-body">
+          <h2 class="text-lg font-semibold text-surface-900 mb-4">Result</h2>
+          <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+            <div class="flex flex-col gap-0.5">
+              <span class="text-xs font-semibold text-surface-400 uppercase">Key</span>
+              <span class="text-sm font-mono text-surface-900">{{ result.key }}</span>
+            </div>
+            <div class="flex flex-col gap-0.5">
+              <span class="text-xs font-semibold text-surface-400 uppercase">Effective Value</span>
+              <span class="text-base font-bold font-mono text-primary-500">{{ result.effectiveValue ?? '(null)' }}</span>
+            </div>
+            <div class="flex flex-col gap-0.5">
+              <span class="text-xs font-semibold text-surface-400 uppercase">Winning Scope</span>
+              <span class="badge badge-info">{{ result.winningScopeType || 'Default' }}</span>
+            </div>
+            <div class="flex flex-col gap-0.5">
+              <span class="text-xs font-semibold text-surface-400 uppercase">Is Default</span>
+              <span [class]="result.isDefault ? 'text-sm font-semibold text-green-600' : 'text-sm text-surface-900'">
+                {{ result.isDefault ? 'Yes' : 'No' }}
+              </span>
+            </div>
+          </div>
+
+          <div *ngIf="result.sourceChain && result.sourceChain.length > 0" class="mt-4">
+            <h3 class="text-base font-semibold text-surface-700 mb-3">Source Chain</h3>
+            <div class="table-wrapper">
+              <table class="min-w-full divide-y divide-surface-200 border border-surface-200 rounded-lg">
+                <thead class="bg-surface-50">
+                  <tr>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-surface-500 uppercase tracking-wider w-10"></th>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-surface-500 uppercase tracking-wider">Scope Type</th>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-surface-500 uppercase tracking-wider">Scope ID</th>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-surface-500 uppercase tracking-wider">Value</th>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-surface-500 uppercase tracking-wider">Priority</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-surface-200">
+                  <tr *ngFor="let link of result.sourceChain"
+                      [class]="link.isWinner ? 'bg-green-50 font-semibold' : 'hover:bg-surface-50'">
+                    <td class="px-4 py-3 text-sm">
+                      <span *ngIf="link.isWinner" class="text-yellow-500 text-base">&#9733;</span>
+                    </td>
+                    <td class="px-4 py-3 text-sm"><span class="badge badge-info">{{ link.scopeType }}</span></td>
+                    <td class="px-4 py-3 text-sm">{{ link.scopeId || '(global)' }}</td>
+                    <td class="px-4 py-3 text-sm font-mono">{{ link.value ?? '(not set)' }}</td>
+                    <td class="px-4 py-3 text-sm">{{ link.priority }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div *ngIf="errorMsg" class="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
         <p>{{ errorMsg }}</p>
       </div>
     </div>
-  `,
-  styles: [`
-    .effective-explorer { padding: 24px; }
-    h1 { margin: 0 0 20px; font-size: 24px; color: #333; }
-    h2 { margin: 0 0 16px; font-size: 18px; color: #333; }
-    h3 { margin: 16px 0 12px; font-size: 16px; color: #555; }
-    .form-card {
-      background: #f8f8fc;
-      border: 1px solid #e0e0e0;
-      border-radius: 6px;
-      padding: 20px;
-      margin-bottom: 24px;
-    }
-    .form-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-      gap: 16px;
-      margin-bottom: 16px;
-    }
-    .full-width { grid-column: 1 / -1; }
-    .form-group {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-    }
-    .form-group label {
-      font-size: 12px;
-      font-weight: 600;
-      color: #555;
-      text-transform: uppercase;
-    }
-    .form-group input {
-      padding: 8px 12px;
-      border: 1px solid #ddd;
-      border-radius: 4px;
-      font-size: 14px;
-    }
-    .form-group input:focus { outline: none; border-color: #6c63ff; }
-    .form-actions {
-      display: flex;
-      gap: 10px;
-    }
-    .btn {
-      padding: 8px 20px;
-      background: #6c63ff;
-      color: #fff;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 14px;
-    }
-    .btn:hover { background: #5a52e0; }
-    .btn:disabled { background: #ccc; cursor: not-allowed; }
-    .btn-outline {
-      background: #fff;
-      color: #6c63ff;
-      border: 1px solid #6c63ff;
-    }
-    .btn-outline:hover { background: #f0f0ff; }
-    .btn-outline:disabled { background: #f5f5f5; color: #ccc; border-color: #ccc; }
-    .result-card {
-      background: #fff;
-      border: 1px solid #e0e0e0;
-      border-radius: 6px;
-      padding: 20px;
-    }
-    .result-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-      gap: 16px;
-      margin-bottom: 8px;
-    }
-    .result-item {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-    }
-    .result-item label {
-      font-size: 12px;
-      font-weight: 600;
-      color: #888;
-      text-transform: uppercase;
-    }
-    .result-item span { font-size: 15px; color: #333; }
-    .mono { font-family: monospace; }
-    .value-display {
-      font-family: monospace;
-      font-size: 16px !important;
-      font-weight: 700;
-      color: #6c63ff !important;
-    }
-    .scope-badge {
-      display: inline-block;
-      padding: 2px 8px;
-      background: #eeeeff;
-      color: #6c63ff;
-      border-radius: 10px;
-      font-size: 12px;
-    }
-    .default-yes { color: #2a9d2a; font-weight: 600; }
-    .default-no { color: #333; }
-    .source-chain { margin-top: 16px; }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      border: 1px solid #e0e0e0;
-    }
-    thead th {
-      text-align: left;
-      padding: 10px 14px;
-      background: #f8f8fc;
-      border-bottom: 2px solid #e0e0e0;
-      font-size: 13px;
-      color: #555;
-      font-weight: 600;
-    }
-    tbody td {
-      padding: 10px 14px;
-      border-bottom: 1px solid #f0f0f0;
-      font-size: 14px;
-      color: #333;
-    }
-    tbody tr:hover { background: #f5f5ff; }
-    tbody tr.winner {
-      background: #eaffea;
-      font-weight: 600;
-    }
-    tbody tr.winner:hover { background: #ddf5dd; }
-    .winner-icon { color: #f5a623; font-size: 16px; }
-    .error-card {
-      background: #fff5f5;
-      border: 1px solid #ffcccc;
-      border-radius: 6px;
-      padding: 16px;
-      color: #d44;
-    }
-  `]
+  `
 })
 export class EffectiveExplorerComponent {
   key = '';

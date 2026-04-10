@@ -5,46 +5,36 @@ import { ApiService } from '../../services/api.service';
   selector: 'app-dashboard',
   standalone: true,
   template: `
-    <div class="dashboard">
-      <h1>Dashboard</h1>
-      <div class="stats-grid">
-        <div class="stat-card">
-          <div class="stat-value">{{ definitionCount }}</div>
-          <div class="stat-label">Definitions</div>
+    <div class="p-6">
+      <h1 class="page-header">Dashboard</h1>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="card">
+          <div class="card-body text-center">
+            <div class="text-3xl font-bold text-primary-500">{{ definitionCount }}</div>
+            <div class="text-sm text-surface-500 mt-1">Definitions</div>
+          </div>
         </div>
-        <div class="stat-card">
-          <div class="stat-value">{{ categoryCount }}</div>
-          <div class="stat-label">Categories</div>
+        <div class="card">
+          <div class="card-body text-center">
+            <div class="text-3xl font-bold text-primary-500">{{ categoryCount }}</div>
+            <div class="text-sm text-surface-500 mt-1">Categories</div>
+          </div>
         </div>
-        <div class="stat-card">
-          <div class="stat-value">{{ secretCount }}</div>
-          <div class="stat-label">Secrets</div>
+        <div class="card">
+          <div class="card-body text-center">
+            <div class="text-3xl font-bold text-primary-500">{{ secretCount }}</div>
+            <div class="text-sm text-surface-500 mt-1">Secrets</div>
+          </div>
         </div>
-        <div class="stat-card">
-          <div class="stat-value">{{ auditCount }}</div>
-          <div class="stat-label">Audit Events</div>
+        <div class="card">
+          <div class="card-body text-center">
+            <div class="text-3xl font-bold text-primary-500">{{ auditCount }}</div>
+            <div class="text-sm text-surface-500 mt-1">Audit Events</div>
+          </div>
         </div>
       </div>
     </div>
-  `,
-  styles: [`
-    .dashboard { padding: 24px; }
-    h1 { margin: 0 0 24px; font-size: 24px; color: #333; }
-    .stats-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-      gap: 16px;
-    }
-    .stat-card {
-      background: #fff;
-      border: 1px solid #e0e0e0;
-      border-radius: 8px;
-      padding: 24px;
-      text-align: center;
-    }
-    .stat-value { font-size: 36px; font-weight: 700; color: #6c63ff; }
-    .stat-label { font-size: 14px; color: #888; margin-top: 4px; }
-  `]
+  `
 })
 export class DashboardComponent implements OnInit {
   definitionCount = 0;

@@ -6,62 +6,55 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
   standalone: true,
   imports: [RouterLink, RouterLinkActive],
   template: `
-    <nav class="sidebar">
-      <div class="sidebar-header">
-        <h2>Andy Settings</h2>
+    <nav class="w-[280px] min-h-screen bg-surface-900 text-surface-300 flex flex-col">
+      <div class="px-5 py-4 border-b border-surface-700">
+        <h2 class="text-lg font-semibold text-white m-0">Andy Settings</h2>
       </div>
-      <ul class="sidebar-nav">
-        <li><a routerLink="/dashboard" routerLinkActive="active">Dashboard</a></li>
-        <li><a routerLink="/definitions" routerLinkActive="active">Definitions</a></li>
-        <li><a routerLink="/values" routerLinkActive="active">Values</a></li>
-        <li><a routerLink="/effective" routerLinkActive="active">Effective</a></li>
-        <li><a routerLink="/secrets" routerLinkActive="active">Secrets</a></li>
-        <li><a routerLink="/audit" routerLinkActive="active">Audit</a></li>
-        <li><a routerLink="/import-export" routerLinkActive="active">Import / Export</a></li>
+      <ul class="list-none p-0 m-0 py-2">
+        <li>
+          <a routerLink="/dashboard" routerLinkActive="bg-surface-800 !text-white !border-l-[3px] !border-primary-500"
+             class="block px-5 py-2.5 text-sm text-surface-400 hover:bg-surface-800 hover:text-white transition-colors no-underline border-l-[3px] border-transparent">
+            Dashboard
+          </a>
+        </li>
+        <li>
+          <a routerLink="/definitions" routerLinkActive="bg-surface-800 !text-white !border-l-[3px] !border-primary-500"
+             class="block px-5 py-2.5 text-sm text-surface-400 hover:bg-surface-800 hover:text-white transition-colors no-underline border-l-[3px] border-transparent">
+            Definitions
+          </a>
+        </li>
+        <li>
+          <a routerLink="/values" routerLinkActive="bg-surface-800 !text-white !border-l-[3px] !border-primary-500"
+             class="block px-5 py-2.5 text-sm text-surface-400 hover:bg-surface-800 hover:text-white transition-colors no-underline border-l-[3px] border-transparent">
+            Values
+          </a>
+        </li>
+        <li>
+          <a routerLink="/effective" routerLinkActive="bg-surface-800 !text-white !border-l-[3px] !border-primary-500"
+             class="block px-5 py-2.5 text-sm text-surface-400 hover:bg-surface-800 hover:text-white transition-colors no-underline border-l-[3px] border-transparent">
+            Effective
+          </a>
+        </li>
+        <li>
+          <a routerLink="/secrets" routerLinkActive="bg-surface-800 !text-white !border-l-[3px] !border-primary-500"
+             class="block px-5 py-2.5 text-sm text-surface-400 hover:bg-surface-800 hover:text-white transition-colors no-underline border-l-[3px] border-transparent">
+            Secrets
+          </a>
+        </li>
+        <li>
+          <a routerLink="/audit" routerLinkActive="bg-surface-800 !text-white !border-l-[3px] !border-primary-500"
+             class="block px-5 py-2.5 text-sm text-surface-400 hover:bg-surface-800 hover:text-white transition-colors no-underline border-l-[3px] border-transparent">
+            Audit
+          </a>
+        </li>
+        <li>
+          <a routerLink="/import-export" routerLinkActive="bg-surface-800 !text-white !border-l-[3px] !border-primary-500"
+             class="block px-5 py-2.5 text-sm text-surface-400 hover:bg-surface-800 hover:text-white transition-colors no-underline border-l-[3px] border-transparent">
+            Import / Export
+          </a>
+        </li>
       </ul>
     </nav>
-  `,
-  styles: [`
-    .sidebar {
-      width: 240px;
-      min-height: 100vh;
-      background: #1a1a2e;
-      color: #e0e0e0;
-      padding: 0;
-      display: flex;
-      flex-direction: column;
-    }
-    .sidebar-header {
-      padding: 20px;
-      border-bottom: 1px solid #2a2a4a;
-    }
-    .sidebar-header h2 {
-      margin: 0;
-      font-size: 18px;
-      color: #fff;
-    }
-    .sidebar-nav {
-      list-style: none;
-      padding: 8px 0;
-      margin: 0;
-    }
-    .sidebar-nav li a {
-      display: block;
-      padding: 10px 20px;
-      color: #b0b0c0;
-      text-decoration: none;
-      font-size: 14px;
-      transition: background 0.15s, color 0.15s;
-    }
-    .sidebar-nav li a:hover {
-      background: #2a2a4a;
-      color: #fff;
-    }
-    .sidebar-nav li a.active {
-      background: #3a3a6a;
-      color: #fff;
-      border-left: 3px solid #6c63ff;
-    }
-  `]
+  `
 })
 export class SidebarComponent {}

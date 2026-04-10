@@ -8,139 +8,59 @@ import { ApiService } from '../../services/api.service';
   standalone: true,
   imports: [CommonModule, FormsModule],
   template: `
-    <div class="audit-timeline">
-      <h1>Audit Timeline</h1>
+    <div class="p-6">
+      <h1 class="page-header">Audit Timeline</h1>
 
-      <div class="toolbar">
+      <div class="flex gap-3 mb-4">
         <input
           type="text"
-          class="filter-input"
+          class="form-input max-w-[400px]"
           placeholder="Filter by definition key..."
           [(ngModel)]="keyFilter"
         />
-        <button class="btn" (click)="applyFilter()">Filter</button>
-        <button class="btn btn-outline" *ngIf="keyFilter" (click)="clearFilter()">Clear</button>
+        <button class="btn-primary" (click)="applyFilter()">Filter</button>
+        <button class="btn-secondary" *ngIf="keyFilter" (click)="clearFilter()">Clear</button>
       </div>
 
-      <div class="table-container">
-        <table>
-          <thead>
+      <div class="table-wrapper">
+        <table class="min-w-full divide-y divide-surface-200 bg-white border border-surface-200 rounded-lg">
+          <thead class="bg-surface-50">
             <tr>
-              <th>Event Type</th>
-              <th>Definition Key</th>
-              <th>Scope Type</th>
-              <th>Actor</th>
-              <th>Created At</th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-surface-500 uppercase tracking-wider">Event Type</th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-surface-500 uppercase tracking-wider">Definition Key</th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-surface-500 uppercase tracking-wider">Scope Type</th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-surface-500 uppercase tracking-wider">Actor</th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-surface-500 uppercase tracking-wider">Created At</th>
             </tr>
           </thead>
-          <tbody>
-            <tr *ngFor="let evt of events">
-              <td>
-                <span class="event-badge" [ngClass]="getEventClass(evt.eventType)">
+          <tbody class="divide-y divide-surface-200">
+            <tr *ngFor="let evt of events" class="hover:bg-surface-50 transition-colors">
+              <td class="px-4 py-3 text-sm">
+                <span [class]="getEventBadgeClass(evt.eventType)">
                   {{ evt.eventType }}
                 </span>
               </td>
-              <td class="key-cell">{{ evt.definitionKey }}</td>
-              <td>{{ evt.scopeType || '-' }}</td>
-              <td>{{ evt.actorId || '-' }}</td>
-              <td class="date-cell">{{ formatDate(evt.createdAt) }}</td>
+              <td class="px-4 py-3 text-sm font-mono font-semibold text-primary-500">{{ evt.definitionKey }}</td>
+              <td class="px-4 py-3 text-sm">{{ evt.scopeType || '-' }}</td>
+              <td class="px-4 py-3 text-sm">{{ evt.actorId || '-' }}</td>
+              <td class="px-4 py-3 text-sm text-surface-500 whitespace-nowrap">{{ formatDate(evt.createdAt) }}</td>
             </tr>
             <tr *ngIf="events.length === 0">
-              <td colspan="5" class="empty-cell">No audit events found.</td>
+              <td colspan="5" class="px-4 py-6 text-center text-sm text-surface-400 italic">No audit events found.</td>
             </tr>
           </tbody>
         </table>
       </div>
 
-      <div class="pagination">
-        <button class="btn" [disabled]="page <= 1" (click)="goToPage(page - 1)">Previous</button>
-        <span class="page-info">Page {{ page }} of {{ totalPages }} ({{ totalCount }} total)</span>
-        <button class="btn" [disabled]="page >= totalPages" (click)="goToPage(page + 1)">Next</button>
+      <div class="flex items-center justify-center gap-4 mt-4">
+        <button class="btn-primary btn-sm" [disabled]="page <= 1" (click)="goToPage(page - 1)"
+                [class.opacity-50]="page <= 1" [class.cursor-not-allowed]="page <= 1">Previous</button>
+        <span class="text-sm text-surface-500">Page {{ page }} of {{ totalPages }} ({{ totalCount }} total)</span>
+        <button class="btn-primary btn-sm" [disabled]="page >= totalPages" (click)="goToPage(page + 1)"
+                [class.opacity-50]="page >= totalPages" [class.cursor-not-allowed]="page >= totalPages">Next</button>
       </div>
     </div>
-  `,
-  styles: [`
-    .audit-timeline { padding: 24px; }
-    h1 { margin: 0 0 20px; font-size: 24px; color: #333; }
-    .toolbar {
-      display: flex;
-      gap: 10px;
-      margin-bottom: 16px;
-    }
-    .filter-input {
-      flex: 1;
-      max-width: 400px;
-      padding: 8px 12px;
-      border: 1px solid #ddd;
-      border-radius: 4px;
-      font-size: 14px;
-    }
-    .filter-input:focus { outline: none; border-color: #6c63ff; }
-    .table-container { overflow-x: auto; }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      background: #fff;
-      border: 1px solid #e0e0e0;
-    }
-    thead th {
-      text-align: left;
-      padding: 10px 14px;
-      background: #f8f8fc;
-      border-bottom: 2px solid #e0e0e0;
-      font-size: 13px;
-      color: #555;
-      font-weight: 600;
-    }
-    tbody td {
-      padding: 10px 14px;
-      border-bottom: 1px solid #f0f0f0;
-      font-size: 14px;
-      color: #333;
-    }
-    tbody tr:hover { background: #f5f5ff; }
-    .key-cell { font-family: monospace; color: #6c63ff; font-weight: 600; }
-    .date-cell { font-size: 13px; color: #666; white-space: nowrap; }
-    .empty-cell { text-align: center; color: #888; font-style: italic; padding: 24px 14px; }
-    .event-badge {
-      display: inline-block;
-      padding: 3px 10px;
-      border-radius: 10px;
-      font-size: 12px;
-      font-weight: 600;
-      text-transform: uppercase;
-    }
-    .event-created { background: #eaffea; color: #1a8a1a; }
-    .event-updated { background: #fff8e0; color: #b08800; }
-    .event-deleted { background: #fff0f0; color: #d44; }
-    .event-rotated { background: #e8f0ff; color: #3366cc; }
-    .event-default { background: #f0f0f0; color: #666; }
-    .pagination {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 16px;
-      margin-top: 16px;
-    }
-    .page-info { font-size: 14px; color: #666; }
-    .btn {
-      padding: 8px 16px;
-      background: #6c63ff;
-      color: #fff;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 14px;
-    }
-    .btn:hover { background: #5a52e0; }
-    .btn:disabled { background: #ccc; cursor: not-allowed; }
-    .btn-outline {
-      background: #fff;
-      color: #6c63ff;
-      border: 1px solid #6c63ff;
-    }
-    .btn-outline:hover { background: #f0f0ff; }
-  `]
+  `
 })
 export class AuditTimelineComponent implements OnInit {
   events: any[] = [];
@@ -184,14 +104,14 @@ export class AuditTimelineComponent implements OnInit {
     this.loadEvents();
   }
 
-  getEventClass(eventType: string): string {
-    if (!eventType) return 'event-default';
+  getEventBadgeClass(eventType: string): string {
+    if (!eventType) return 'badge badge-default';
     const lower = eventType.toLowerCase();
-    if (lower.includes('created') || lower === 'created') return 'event-created';
-    if (lower.includes('updated') || lower === 'updated') return 'event-updated';
-    if (lower.includes('deleted') || lower === 'deleted') return 'event-deleted';
-    if (lower.includes('rotated') || lower.includes('secret')) return 'event-rotated';
-    return 'event-default';
+    if (lower.includes('created') || lower === 'created') return 'badge badge-success';
+    if (lower.includes('updated') || lower === 'updated') return 'badge badge-warning';
+    if (lower.includes('deleted') || lower === 'deleted') return 'badge badge-danger';
+    if (lower.includes('rotated') || lower.includes('secret')) return 'badge badge-info';
+    return 'badge badge-default';
   }
 
   formatDate(dateStr: string): string {

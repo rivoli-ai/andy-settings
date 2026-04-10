@@ -8,189 +8,80 @@ import { ApiService } from '../../services/api.service';
   standalone: true,
   imports: [CommonModule, FormsModule],
   template: `
-    <div class="secret-manager">
-      <h1>Secret Manager</h1>
+    <div class="p-6">
+      <h1 class="page-header">Secret Manager</h1>
 
-      <div class="table-container" *ngIf="secrets.length > 0">
-        <table>
-          <thead>
+      <div class="table-wrapper mb-6" *ngIf="secrets.length > 0">
+        <table class="min-w-full divide-y divide-surface-200 bg-white border border-surface-200 rounded-lg">
+          <thead class="bg-surface-50">
             <tr>
-              <th>Key</th>
-              <th>App</th>
-              <th>Category</th>
-              <th>Has Value</th>
-              <th>Actions</th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-surface-500 uppercase tracking-wider">Key</th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-surface-500 uppercase tracking-wider">App</th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-surface-500 uppercase tracking-wider">Category</th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-surface-500 uppercase tracking-wider">Has Value</th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-surface-500 uppercase tracking-wider">Actions</th>
             </tr>
           </thead>
-          <tbody>
-            <tr *ngFor="let s of secrets" [class.selected]="selectedKey === s.key">
-              <td class="key-cell">{{ s.key }}</td>
-              <td>{{ s.applicationCode }}</td>
-              <td>{{ s.category }}</td>
-              <td>
-                <span class="has-value-badge" [class.has-value]="s.hasValue">
+          <tbody class="divide-y divide-surface-200">
+            <tr *ngFor="let s of secrets"
+                class="hover:bg-surface-50 transition-colors"
+                [class.bg-primary-50]="selectedKey === s.key">
+              <td class="px-4 py-3 text-sm font-mono font-semibold text-primary-500">{{ s.key }}</td>
+              <td class="px-4 py-3 text-sm">{{ s.applicationCode }}</td>
+              <td class="px-4 py-3 text-sm">{{ s.category }}</td>
+              <td class="px-4 py-3 text-sm">
+                <span [class]="s.hasValue ? 'badge badge-success' : 'badge badge-danger'">
                   {{ s.hasValue ? 'Set' : 'Not set' }}
                 </span>
               </td>
-              <td>
-                <button class="btn-sm" (click)="openSetForm(s)">Set Secret</button>
-                <button class="btn-sm btn-rotate" (click)="rotateSecret(s)" title="Rotate secret">
-                  Rotate
-                </button>
+              <td class="px-4 py-3 text-sm">
+                <div class="flex gap-2">
+                  <button class="btn-primary btn-sm" (click)="openSetForm(s)">Set Secret</button>
+                  <button class="btn-secondary btn-sm" (click)="rotateSecret(s)">Rotate</button>
+                </div>
               </td>
             </tr>
           </tbody>
         </table>
       </div>
 
-      <p class="empty-msg" *ngIf="secrets.length === 0 && !loading">
+      <p class="text-sm text-surface-400 italic" *ngIf="secrets.length === 0 && !loading">
         No secret definitions found.
       </p>
-      <p class="empty-msg" *ngIf="loading">Loading...</p>
+      <p class="text-sm text-surface-400 italic" *ngIf="loading">Loading...</p>
 
-      <div class="form-card" *ngIf="selectedKey">
-        <h2>Set Secret: <span class="key-highlight">{{ selectedKey }}</span></h2>
-        <div class="form-grid">
-          <div class="form-group">
-            <label>Scope Type</label>
-            <select [(ngModel)]="form.scopeType">
-              <option value="">-- Select --</option>
-              <option *ngFor="let st of scopeTypes" [value]="st">{{ st }}</option>
-            </select>
+      <div class="card" *ngIf="selectedKey">
+        <div class="card-body">
+          <h2 class="text-lg font-semibold text-surface-900 mb-4">
+            Set Secret: <span class="text-primary-500 font-mono">{{ selectedKey }}</span>
+          </h2>
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+            <div>
+              <label class="form-label">Scope Type</label>
+              <select class="form-select" [(ngModel)]="form.scopeType">
+                <option value="">-- Select --</option>
+                <option *ngFor="let st of scopeTypes" [value]="st">{{ st }}</option>
+              </select>
+            </div>
+            <div>
+              <label class="form-label">Scope ID</label>
+              <input type="text" class="form-input" [(ngModel)]="form.scopeId" placeholder="Optional scope ID" />
+            </div>
+            <div>
+              <label class="form-label">Secret Value</label>
+              <input type="password" class="form-input" [(ngModel)]="form.value" placeholder="Enter secret value" />
+            </div>
           </div>
-          <div class="form-group">
-            <label>Scope ID</label>
-            <input type="text" [(ngModel)]="form.scopeId" placeholder="Optional scope ID" />
+          <div class="flex items-center gap-3">
+            <button class="btn-primary" (click)="saveSecret()" [disabled]="!form.value">Save Secret</button>
+            <button class="btn-secondary" (click)="cancelForm()">Cancel</button>
+            <span class="text-sm text-green-600" *ngIf="successMsg">{{ successMsg }}</span>
+            <span class="text-sm text-red-500" *ngIf="errorMsg">{{ errorMsg }}</span>
           </div>
-          <div class="form-group">
-            <label>Secret Value</label>
-            <input type="password" [(ngModel)]="form.value" placeholder="Enter secret value" />
-          </div>
-        </div>
-        <div class="form-actions">
-          <button class="btn" (click)="saveSecret()" [disabled]="!form.value">Save Secret</button>
-          <button class="btn btn-cancel" (click)="cancelForm()">Cancel</button>
-          <span class="status-msg success" *ngIf="successMsg">{{ successMsg }}</span>
-          <span class="status-msg error" *ngIf="errorMsg">{{ errorMsg }}</span>
         </div>
       </div>
     </div>
-  `,
-  styles: [`
-    .secret-manager { padding: 24px; }
-    h1 { margin: 0 0 20px; font-size: 24px; color: #333; }
-    h2 { margin: 0 0 16px; font-size: 18px; color: #333; }
-    h2 .key-highlight { color: #6c63ff; font-family: monospace; }
-    .table-container { overflow-x: auto; margin-bottom: 24px; }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      background: #fff;
-      border: 1px solid #e0e0e0;
-    }
-    thead th {
-      text-align: left;
-      padding: 10px 14px;
-      background: #f8f8fc;
-      border-bottom: 2px solid #e0e0e0;
-      font-size: 13px;
-      color: #555;
-      font-weight: 600;
-    }
-    tbody td {
-      padding: 10px 14px;
-      border-bottom: 1px solid #f0f0f0;
-      font-size: 14px;
-      color: #333;
-    }
-    tbody tr:hover { background: #f5f5ff; }
-    tbody tr.selected { background: #eeeeff; }
-    .key-cell { font-family: monospace; font-weight: 600; color: #6c63ff; }
-    .has-value-badge {
-      display: inline-block;
-      padding: 2px 8px;
-      background: #fff0f0;
-      color: #d44;
-      border-radius: 10px;
-      font-size: 12px;
-    }
-    .has-value-badge.has-value { background: #eaffea; color: #2a9d2a; }
-    .btn-sm {
-      padding: 4px 10px;
-      background: #6c63ff;
-      color: #fff;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 12px;
-      margin-right: 6px;
-    }
-    .btn-sm:hover { background: #5a52e0; }
-    .btn-rotate {
-      background: #fff;
-      color: #6c63ff;
-      border: 1px solid #6c63ff;
-    }
-    .btn-rotate:hover { background: #f0f0ff; }
-    .empty-msg { color: #888; font-size: 14px; font-style: italic; }
-    .form-card {
-      background: #f8f8fc;
-      border: 1px solid #e0e0e0;
-      border-radius: 6px;
-      padding: 20px;
-    }
-    .form-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-      gap: 16px;
-      margin-bottom: 16px;
-    }
-    .form-group {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-    }
-    .form-group label {
-      font-size: 12px;
-      font-weight: 600;
-      color: #555;
-      text-transform: uppercase;
-    }
-    .form-group input,
-    .form-group select {
-      padding: 8px 12px;
-      border: 1px solid #ddd;
-      border-radius: 4px;
-      font-size: 14px;
-    }
-    .form-group input:focus,
-    .form-group select:focus { outline: none; border-color: #6c63ff; }
-    .form-actions {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-    .btn {
-      padding: 8px 20px;
-      background: #6c63ff;
-      color: #fff;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 14px;
-    }
-    .btn:hover { background: #5a52e0; }
-    .btn:disabled { background: #ccc; cursor: not-allowed; }
-    .btn-cancel {
-      background: #fff;
-      color: #888;
-      border: 1px solid #ddd;
-    }
-    .btn-cancel:hover { background: #f5f5f5; }
-    .status-msg { font-size: 13px; }
-    .status-msg.success { color: #2a9d2a; }
-    .status-msg.error { color: #d44; }
-  `]
+  `
 })
 export class SecretManagerComponent implements OnInit {
   secrets: any[] = [];
