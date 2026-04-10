@@ -20,23 +20,30 @@ public class AuditRepository : IAuditService
     {
         var q = _db.AuditEvents.AsQueryable();
 
+        // SQLite has limited support for DateTimeOffset and enum conversions.
+        // Apply simple string filters in SQL, then do date/enum filters + sort in memory.
         if (!string.IsNullOrEmpty(query.DefinitionKey))
             q = q.Where(e => e.DefinitionKey == query.DefinitionKey);
-        if (query.DateFrom.HasValue)
-            q = q.Where(e => e.CreatedAt >= query.DateFrom.Value);
-        if (query.DateTo.HasValue)
-            q = q.Where(e => e.CreatedAt <= query.DateTo.Value);
         if (!string.IsNullOrEmpty(query.ActorId))
             q = q.Where(e => e.ActorId == query.ActorId);
-        if (query.EventType.HasValue)
-            q = q.Where(e => e.EventType == query.EventType.Value);
 
-        var totalCount = await q.CountAsync(ct);
-        var items = await q
-            .OrderByDescending(e => e.Id)
+        var filtered = await q.AsNoTracking().ToListAsync(ct);
+
+        if (query.EventType.HasValue)
+            filtered = filtered.Where(e => e.EventType == query.EventType.Value).ToList();
+
+        // Apply date filters in memory (if provided)
+        if (query.DateFrom.HasValue)
+            filtered = filtered.Where(e => e.CreatedAt >= query.DateFrom.Value).ToList();
+        if (query.DateTo.HasValue)
+            filtered = filtered.Where(e => e.CreatedAt <= query.DateTo.Value).ToList();
+
+        var totalCount = filtered.Count;
+        var items = filtered
+            .OrderByDescending(e => e.CreatedAt)
             .Skip((query.Page - 1) * query.PageSize)
             .Take(query.PageSize)
-            .ToListAsync(ct);
+            .ToList();
 
         return new PagedResult<AuditEventDto>(
             items.Select(ToDto).ToList(),

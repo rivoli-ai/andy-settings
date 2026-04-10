@@ -39,12 +39,12 @@ public static class ValueCommands
 
             using var client = HttpClientFactory.Create(apiUrl);
 
-            var payload = new Dictionary<string, object?> { ["key"] = key };
-            if (!string.IsNullOrEmpty(scope)) payload["scope"] = scope;
-            if (!string.IsNullOrEmpty(scopeId)) payload["scopeId"] = scopeId;
-            if (!string.IsNullOrEmpty(user)) payload["user"] = user;
-            if (!string.IsNullOrEmpty(team)) payload["team"] = team;
-            if (!string.IsNullOrEmpty(app)) payload["app"] = app;
+            var context = new Dictionary<string, object?>();
+            if (!string.IsNullOrEmpty(user)) context["userId"] = user;
+            if (!string.IsNullOrEmpty(team)) context["teamId"] = team;
+            if (!string.IsNullOrEmpty(app)) context["applicationCode"] = app;
+
+            var payload = new Dictionary<string, object?> { ["key"] = key, ["context"] = context };
 
             try
             {
@@ -68,14 +68,14 @@ public static class ValueCommands
                 using var doc = JsonDocument.Parse(body);
                 var root = doc.RootElement;
 
-                if (root.TryGetProperty("value", out var valueEl))
-                {
-                    Console.WriteLine(valueEl.ToString());
-                }
+                var effectiveValue = root.TryGetProperty("effectiveValue", out var ev) ? ev.ToString() : "(no value)";
+                var isDefault = root.TryGetProperty("isDefault", out var id) && id.GetBoolean();
+                var winningScope = root.TryGetProperty("winningScopeType", out var ws) ? ws.ToString() : "default";
+                Console.WriteLine($"{effectiveValue}");
+                if (!isDefault)
+                    Console.WriteLine($"  (scope: {winningScope})");
                 else
-                {
-                    Console.WriteLine(body);
-                }
+                    Console.WriteLine($"  (default)");
             }
             catch (HttpRequestException ex)
             {
@@ -109,11 +109,20 @@ public static class ValueCommands
 
             using var client = HttpClientFactory.Create(apiUrl);
 
+            // Auto-wrap string values in JSON quotes if not already JSON
+            var valueJson = value;
+            if (!value.StartsWith('"') && !value.StartsWith('{') && !value.StartsWith('[')
+                && value != "true" && value != "false"
+                && !double.TryParse(value, out _))
+            {
+                valueJson = $"\"{value}\"";
+            }
+
             var payload = new Dictionary<string, object?>
             {
-                ["key"] = key,
-                ["value"] = value,
-                ["scope"] = scope
+                ["definitionKey"] = key,
+                ["valueJson"] = valueJson,
+                ["scopeType"] = scope
             };
             if (!string.IsNullOrEmpty(scopeId)) payload["scopeId"] = scopeId;
 
@@ -179,7 +188,10 @@ public static class ValueCommands
                 }
 
                 using var doc = JsonDocument.Parse(lookupBody);
-                var items = doc.RootElement.EnumerateArray();
+                var root = doc.RootElement;
+                var items = root.ValueKind == JsonValueKind.Array
+                    ? root.EnumerateArray()
+                    : root.GetProperty("items").EnumerateArray();
                 string? assignmentId = null;
 
                 foreach (var item in items)
@@ -332,10 +344,12 @@ public static class ValueCommands
 
             using var client = HttpClientFactory.Create(apiUrl);
 
-            var payload = new Dictionary<string, object?> { ["key"] = key };
-            if (!string.IsNullOrEmpty(user)) payload["user"] = user;
-            if (!string.IsNullOrEmpty(team)) payload["team"] = team;
-            if (!string.IsNullOrEmpty(app)) payload["app"] = app;
+            var context = new Dictionary<string, object?>();
+            if (!string.IsNullOrEmpty(user)) context["userId"] = user;
+            if (!string.IsNullOrEmpty(team)) context["teamId"] = team;
+            if (!string.IsNullOrEmpty(app)) context["applicationCode"] = app;
+
+            var payload = new Dictionary<string, object?> { ["key"] = key, ["context"] = context };
 
             try
             {
@@ -367,28 +381,25 @@ public static class ValueCommands
                 }
 
                 // Display source chain as table
-                if (root.TryGetProperty("sources", out var sources) &&
+                if (root.TryGetProperty("sourceChain", out var sources) &&
                     sources.ValueKind == JsonValueKind.Array)
                 {
                     var table = new Table();
                     table.Border(TableBorder.Rounded);
-                    table.AddColumn("Priority");
                     table.AddColumn("Scope");
                     table.AddColumn("ScopeId");
                     table.AddColumn("Value");
-                    table.AddColumn("Source");
+                    table.AddColumn("Winner");
 
-                    var priority = 1;
                     foreach (var source in sources.EnumerateArray())
                     {
+                        var isWinner = source.TryGetProperty("isWinner", out var w) && w.GetBoolean();
                         table.AddRow(
-                            priority.ToString(),
-                            source.TryGetProperty("scope", out var sc) ? sc.GetString() ?? "" : "",
+                            source.TryGetProperty("scopeType", out var sc) ? sc.GetString() ?? "" : "",
                             source.TryGetProperty("scopeId", out var sid) ? sid.GetString() ?? "" : "",
-                            source.TryGetProperty("value", out var v) ? v.ToString() : "",
-                            source.TryGetProperty("source", out var sr) ? sr.GetString() ?? "" : ""
+                            source.TryGetProperty("valueJson", out var v) ? v.ToString() : "",
+                            isWinner ? "[green]*[/]" : ""
                         );
-                        priority++;
                     }
 
                     AnsiConsole.Write(table);

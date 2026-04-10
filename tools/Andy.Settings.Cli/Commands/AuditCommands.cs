@@ -55,7 +55,10 @@ public static class AuditCommands
                 }
 
                 using var doc = JsonDocument.Parse(body);
-                var items = doc.RootElement.EnumerateArray();
+                var root = doc.RootElement;
+                var items = root.ValueKind == JsonValueKind.Array
+                    ? root.EnumerateArray()
+                    : root.GetProperty("items").EnumerateArray();
 
                 var table = new Table();
                 table.Border(TableBorder.Rounded);
