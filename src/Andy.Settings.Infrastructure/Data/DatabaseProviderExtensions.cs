@@ -15,13 +15,17 @@ public static class DatabaseProviderExtensions
             if (provider.Equals("Sqlite", StringComparison.OrdinalIgnoreCase))
             {
                 var connectionString = configuration.GetConnectionString("DefaultConnection");
-                if (string.IsNullOrEmpty(connectionString))
+
+                // Ignore PostgreSQL-style connection strings when SQLite is selected
+                if (string.IsNullOrEmpty(connectionString) ||
+                    connectionString.Contains("Host=", StringComparison.OrdinalIgnoreCase))
                 {
                     var dbPath = GetDefaultSqlitePath();
                     var dir = Path.GetDirectoryName(dbPath)!;
                     Directory.CreateDirectory(dir);
                     connectionString = $"Data Source={dbPath}";
                 }
+
                 options.UseSqlite(connectionString);
             }
             else
@@ -37,13 +41,13 @@ public static class DatabaseProviderExtensions
 
     private static string GetDefaultSqlitePath()
     {
-        // Check if running inside Conductor
-        var conductorPath = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-            "Library", "Application Support", "ai.rivoli.conductor", "db", "andy-settings.sqlite");
-
-        if (Directory.Exists(Path.GetDirectoryName(conductorPath)!))
-            return conductorPath;
+        // Use Conductor path only when explicitly running inside Conductor (env var set by ServiceOrchestrator)
+        if (Environment.GetEnvironmentVariable("CONDUCTOR_EMBEDDED") == "true")
+        {
+            return Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                "Library", "Application Support", "ai.rivoli.conductor", "db", "andy-settings.sqlite");
+        }
 
         // Default standalone path
         return Path.Combine(
