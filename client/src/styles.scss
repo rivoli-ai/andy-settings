@@ -5,10 +5,16 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
 @layer base {
+  html {
+    @apply h-full bg-surface-50;
+  }
   body {
-    @apply font-sans text-surface-900 bg-surface-50 antialiased;
+    @apply h-full m-0 font-sans text-surface-900 bg-surface-50 antialiased;
     font-size: 1rem;
     letter-spacing: -0.01em;
+  }
+  app-root {
+    @apply block h-full;
   }
 }
 
