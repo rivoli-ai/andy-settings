@@ -18,19 +18,25 @@ public class DataSeeder
 
     public async Task SeedAsync(CancellationToken ct = default)
     {
-        if (await _db.SettingDefinitions.AnyAsync(ct))
+        var definitions = BuildSeedDefinitions();
+        var existingKeys = await _db.SettingDefinitions
+            .Select(d => d.Key)
+            .ToListAsync(ct);
+        var toAdd = definitions
+            .Where(d => !existingKeys.Contains(d.Key))
+            .ToList();
+
+        if (toAdd.Count == 0)
         {
-            _logger.LogDebug("Definitions already exist, skipping seed");
+            _logger.LogDebug("All setting definitions already seeded");
             return;
         }
 
-        _logger.LogInformation("Seeding setting definitions...");
-
-        var definitions = BuildSeedDefinitions();
-        _db.SettingDefinitions.AddRange(definitions);
+        _logger.LogInformation("Seeding {Count} new setting definitions...", toAdd.Count);
+        _db.SettingDefinitions.AddRange(toAdd);
         await _db.SaveChangesAsync(ct);
 
-        _logger.LogInformation("Seeded {Count} setting definitions", definitions.Count);
+        _logger.LogInformation("Seeded {Count} new setting definitions", toAdd.Count);
     }
 
     private static List<SettingDefinition> BuildSeedDefinitions()
@@ -125,6 +131,15 @@ public class DataSeeder
         Add("andy.settings.autoMigrate", "settings", "Auto Migrate", "Run database migrations on startup", "Database",
             SettingDataType.Boolean, "true");
         Add("andy.settings.seedOnStartup", "settings", "Seed on Startup", "Seed definitions on startup in development", "Database",
+            SettingDataType.Boolean, "true");
+
+        // andy.tasks
+        Add("andy.tasks.defaultPriority", "andy-tasks", "Default Priority", "Default priority for new items", "General",
+            SettingDataType.String, "\"medium\"",
+            allowedScopes: "[\"Machine\",\"Application\",\"User\",\"Team\"]");
+        Add("andy.tasks.maxItemsPerList", "andy-tasks", "Max Items per List", "Maximum number of items allowed in a single list", "Limits",
+            SettingDataType.Integer, "1000");
+        Add("andy.tasks.enableReminders", "andy-tasks", "Enable Reminders", "Send reminder notifications for due items", "Notifications",
             SettingDataType.Boolean, "true");
 
         return defs;
