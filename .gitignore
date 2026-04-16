@@ -39,3 +39,4 @@ local-packages/*.nupkg
 .env
 *.env.local
 site/
+examples/rust/target/
