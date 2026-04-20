@@ -1,0 +1,42 @@
+{
+  "$schema": "../../andy-service-template/docs/registration.schema.json",
+  "service": {
+    "name": "andy-settings",
+    "displayName": "Andy Settings",
+    "description": "Centralized settings registry — cloud-only service that holds setting definitions for every service in the Andy ecosystem. Reads sibling registration.json files on startup and seeds setting definitions from their 'settings.definitions' sections.",
+    "embeddedProxyPrefix": "/settings",
+    "ports": {
+      "dotnetHttps": 5300,
+      "dotnetHttp":  5301,
+      "dotnetPostgres": 5438,
+      "dockerHttps": 7300,
+      "dockerHttp":  7301,
+      "dockerPostgres": 7438,
+      "embeddedProxy": 9100
+    }
+  },
+  "auth": {
+    "audience": "urn:andy-settings-api"
+  },
+  "rbac": {
+    "applicationCode": "settings",
+    "applicationName": "Andy Settings",
+    "description": "Centralized settings registry",
+    "resourceTypes": [
+      { "code": "definition", "name": "Setting Definition", "supportsInstances": true },
+      { "code": "value",      "name": "Setting Value",      "supportsInstances": true }
+    ],
+    "roles": [
+      { "code": "settings-admin", "name": "Settings Administrator", "description": "Full access to setting definitions and values", "isSystem": true },
+      { "code": "editor",         "name": "Editor",                 "description": "Can edit setting values",                      "isSystem": true },
+      { "code": "viewer",         "name": "Viewer",                 "description": "Read-only access to settings",                 "isSystem": true }
+    ],
+    "testUserRole": "settings-admin"
+  },
+  "settings": {
+    "definitions": [
+      { "key": "andy.settings.autoMigrate",     "displayName": "Auto Migrate",     "description": "Run database migrations on startup",        "category": "Database", "dataType": "Boolean", "defaultValue": true },
+      { "key": "andy.settings.seedOnStartup",   "displayName": "Seed on Startup",  "description": "Seed definitions on startup in development", "category": "Database", "dataType": "Boolean", "defaultValue": true }
+    ]
+  }
+}

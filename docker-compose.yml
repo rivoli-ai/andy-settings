@@ -38,6 +38,11 @@ services:
       - AndyAuth__RequireHttpsMetadata=false
       - Rbac__ApiBaseUrl=https://host.docker.internal:5003
       - Rbac__ApplicationCode=settings
+      # Registration manifests — seed setting definitions from each sibling
+      # service's config/registration.json. andy-settings is cloud-only so
+      # these paths reflect the Rivoli AI monorepo mount in dev; production
+      # populates REGISTRATIONS__MANIFEST_PATHS from the cloud manifest bundle.
+      - REGISTRATIONS__MANIFEST_PATHS=/monorepo/andy-auth/config/registration.json:/monorepo/andy-rbac/config/registration.json:/monorepo/andy-containers/config/registration.json:/monorepo/andy-docs/config/registration.json:/monorepo/andy-code-index/config/registration.json:/monorepo/andy-issues/config/registration.json:/monorepo/andy-agents/config/registration.json:/monorepo/andy-tasks/config/registration.json:/monorepo/andy-policies/config/registration.json:/monorepo/andy-settings/config/registration.json:/monorepo/andy-models/config/registration.json
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
@@ -46,6 +51,7 @@ services:
     volumes:
       - ./certs:/usr/local/share/ca-certificates/custom:ro
       - dpkeys:/app/.aspnet/DataProtection-Keys
+      - ..:/monorepo:ro
     depends_on:
       postgres:
         condition: service_healthy
