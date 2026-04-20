@@ -8,7 +8,7 @@ services:
       POSTGRES_PASSWORD: andy_settings_dev_password
       PGDATA: /var/lib/postgresql/data/pgdata
     ports:
-      - "5438:5432"
+      - "7438:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -41,8 +41,8 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
-      - "5300:8443"
-      - "5301:8080"
+      - "7300:8443"
+      - "7301:8080"
     volumes:
       - ./certs:/usr/local/share/ca-certificates/custom:ro
       - dpkeys:/app/.aspnet/DataProtection-Keys
