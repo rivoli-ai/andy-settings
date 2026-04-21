@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <PackageId>Andy.Settings.Client.TestSupport</PackageId>
+    <Description>FakeAndySettingsClient + related test doubles for consumers of Andy.Settings.Client.</Description>
+    <Authors>Rivoli AI</Authors>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../Andy.Settings.Client/Andy.Settings.Client.csproj" />
+  </ItemGroup>
+
+</Project>
