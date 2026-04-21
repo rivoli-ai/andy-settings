@@ -34,6 +34,7 @@ certs/*.pfx
 
 ## Local packages
 local-packages/*.nupkg
+artifacts/
 
 ## Environment
 .env
