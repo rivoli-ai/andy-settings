@@ -41,3 +41,4 @@ artifacts/
 *.env.local
 site/
 examples/rust/target/
+dist/
