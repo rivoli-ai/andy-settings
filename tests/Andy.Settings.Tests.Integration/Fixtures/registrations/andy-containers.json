@@ -1,0 +1,44 @@
+{
+  "service": {
+    "name": "andy-containers",
+    "displayName": "Andy Containers",
+    "description": "Vendored copy of andy-containers/config/registration.json (settings block only). Provides the real definition keys integration tests reference (andy.containers.defaultProvider, andy.containers.maxCpuCores, andy.containers.sshTimeoutSeconds). If the upstream manifest changes meaningfully, refresh this file."
+  },
+  "settings": {
+    "definitions": [
+      {
+        "key": "andy.containers.defaultProvider",
+        "displayName": "Default Provider",
+        "description": "Default infrastructure provider",
+        "category": "General",
+        "dataType": "String",
+        "defaultValue": "docker",
+        "allowedScopes": ["Machine", "Application", "User", "Team"]
+      },
+      {
+        "key": "andy.containers.maxCpuCores",
+        "displayName": "Max CPU Cores",
+        "description": "Maximum CPU cores per container",
+        "category": "Resources",
+        "dataType": "Integer",
+        "defaultValue": 4
+      },
+      {
+        "key": "andy.containers.maxMemoryMb",
+        "displayName": "Max Memory (MB)",
+        "description": "Maximum memory per container in MB",
+        "category": "Resources",
+        "dataType": "Integer",
+        "defaultValue": 8192
+      },
+      {
+        "key": "andy.containers.sshTimeoutSeconds",
+        "displayName": "SSH Timeout",
+        "description": "SSH connection timeout in seconds",
+        "category": "Connectivity",
+        "dataType": "Integer",
+        "defaultValue": 30
+      }
+    ]
+  }
+}

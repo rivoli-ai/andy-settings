@@ -1,0 +1,21 @@
+{
+  "service": {
+    "name": "test-service-a",
+    "displayName": "Test Service A",
+    "description": "Synthetic registration manifest for andy-settings integration tests. Not a real service — exists only to seed enough SettingDefinition rows to exercise the read APIs deterministically on CI."
+  },
+  "settings": {
+    "definitions": [
+      { "key": "test.serviceA.apiBaseUrl",         "displayName": "Service A API URL", "description": "Base URL of Service A.",         "category": "General",       "dataType": "Uri",     "defaultValue": "https://localhost:6101" },
+      { "key": "test.serviceA.timeoutMs",          "displayName": "Service A Timeout", "description": "Outbound request timeout in ms.", "category": "Performance",  "dataType": "Integer", "defaultValue": 5000 },
+      { "key": "test.serviceA.featureFlagFoo",     "displayName": "Feature Foo",       "description": "Toggle for the Foo path.",        "category": "Feature Flags","dataType": "Boolean", "defaultValue": false },
+      { "key": "test.serviceA.maxBatchSize",       "displayName": "Max Batch Size",    "description": "Cap on per-request batch size.",  "category": "Performance",  "dataType": "Integer", "defaultValue": 100 },
+      { "key": "test.serviceA.retryPolicy",        "displayName": "Retry Policy",      "description": "JSON-encoded retry policy.",      "category": "Resilience",   "dataType": "Json",    "defaultValue": "{\"attempts\":3,\"backoffMs\":250}" },
+      { "key": "test.serviceA.adminEmails",        "displayName": "Admin Emails",      "description": "Comma-separated admin contacts.","category": "Operations",   "dataType": "String",  "defaultValue": "ops@example.invalid" },
+      { "key": "test.serviceA.cacheTtlMs",         "displayName": "Cache TTL",         "description": "Local cache TTL in ms.",          "category": "Performance",  "dataType": "Integer", "defaultValue": 60000 },
+      { "key": "test.serviceA.allowedScopes",      "displayName": "Allowed Scopes",    "description": "Per-tenant overrides.",           "category": "Authorization","dataType": "String",  "defaultValue": "user,team", "allowedScopes": ["tenant", "user"] },
+      { "key": "test.serviceA.secretToken",        "displayName": "Service A Token",   "description": "Bearer token (never persisted).","category": "Secrets",      "dataType": "String",  "isSecret": true },
+      { "key": "test.serviceA.maintenanceMode",    "displayName": "Maintenance Mode",  "description": "Disables write paths.",           "category": "Operations",   "dataType": "Boolean", "defaultValue": false }
+    ]
+  }
+}

@@ -43,7 +43,9 @@ public class DefinitionApiTests : IClassFixture<CustomWebApplicationFactory>
 
         var json = await response.Content.ReadFromJsonAsync<JsonElement>(_jsonOptions);
         json.GetProperty("key").GetString().Should().Be("andy.containers.defaultProvider");
-        json.GetProperty("applicationCode").GetString().Should().Be("containers");
+        // Seeder copies service.name verbatim into ApplicationCode (DataSeeder.cs:81),
+        // and real upstream registration.json files use the full "andy-<area>" form.
+        json.GetProperty("applicationCode").GetString().Should().Be("andy-containers");
     }
 
     [Fact]

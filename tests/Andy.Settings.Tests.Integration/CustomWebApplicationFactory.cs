@@ -25,13 +25,21 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
 
         builder.ConfigureAppConfiguration((context, config) =>
         {
+            // Bundled fixture manifests under tests/.../Fixtures/registrations/
+            // are copied to bin/ via the test csproj. Pointing the seeder at
+            // them keeps integration tests deterministic across Mac/Linux CI —
+            // production reads from /etc/andy/registrations or whatever path
+            // ops configures, but tests must not depend on the dev workstation.
+            var fixtureDir = Path.Combine(AppContext.BaseDirectory, "Fixtures", "registrations");
+
             config.AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["AndyAuth:Authority"] = "",
                 ["Rbac:ApiBaseUrl"] = "",
                 ["Database:Provider"] = "Sqlite",
                 ["OpenTelemetry:OtlpEndpoint"] = "",
-                ["ConnectionStrings:DefaultConnection"] = ""
+                ["ConnectionStrings:DefaultConnection"] = "",
+                ["Registrations:ManifestPaths:0"] = fixtureDir,
             });
         });
 

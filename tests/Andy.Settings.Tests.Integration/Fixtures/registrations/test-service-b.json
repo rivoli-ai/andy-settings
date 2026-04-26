@@ -1,0 +1,21 @@
+{
+  "service": {
+    "name": "test-service-b",
+    "displayName": "Test Service B",
+    "description": "Synthetic registration manifest for andy-settings integration tests. Provides additional SettingDefinition rows so the test seed crosses the >= 25 threshold without depending on co-located sibling repos."
+  },
+  "settings": {
+    "definitions": [
+      { "key": "test.serviceB.apiBaseUrl",         "displayName": "Service B API URL",       "description": "Base URL of Service B.",                "category": "General",      "dataType": "Uri",     "defaultValue": "https://localhost:6201" },
+      { "key": "test.serviceB.queueName",          "displayName": "Queue Name",              "description": "Default outbound queue.",               "category": "Messaging",    "dataType": "String",  "defaultValue": "service-b-default" },
+      { "key": "test.serviceB.maxConcurrency",     "displayName": "Max Concurrency",         "description": "Worker concurrency limit.",             "category": "Performance",  "dataType": "Integer", "defaultValue": 8 },
+      { "key": "test.serviceB.experimentalEnabled","displayName": "Experimental Enabled",    "description": "Enables the experimental codepath.",    "category": "Feature Flags","dataType": "Boolean", "defaultValue": false },
+      { "key": "test.serviceB.allowedOrigins",     "displayName": "Allowed Origins",         "description": "JSON list of allowed CORS origins.",    "category": "Security",     "dataType": "Json",    "defaultValue": "[\"https://localhost:6200\"]" },
+      { "key": "test.serviceB.dailyBudgetCents",   "displayName": "Daily Budget (cents)",    "description": "Per-tenant daily spend cap.",           "category": "Quotas",       "dataType": "Decimal", "defaultValue": 0, "allowedScopes": ["tenant"] },
+      { "key": "test.serviceB.featureFlagBar",     "displayName": "Feature Bar",             "description": "Toggle for the Bar codepath.",          "category": "Feature Flags","dataType": "Boolean", "defaultValue": true },
+      { "key": "test.serviceB.smtpHost",           "displayName": "SMTP Host",               "description": "Outbound SMTP relay hostname.",         "category": "Notifications","dataType": "String",  "defaultValue": "localhost" },
+      { "key": "test.serviceB.smtpPort",           "displayName": "SMTP Port",               "description": "Outbound SMTP relay port.",             "category": "Notifications","dataType": "Integer", "defaultValue": 25 },
+      { "key": "test.serviceB.smtpPassword",       "displayName": "SMTP Password",           "description": "SMTP credential (never persisted).",    "category": "Secrets",      "dataType": "String",  "isSecret": true }
+    ]
+  }
+}
