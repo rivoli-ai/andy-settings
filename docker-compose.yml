@@ -42,7 +42,7 @@ services:
       # service's config/registration.json. andy-settings is cloud-only so
       # these paths reflect the Rivoli AI monorepo mount in dev; production
       # populates REGISTRATIONS__MANIFEST_PATHS from the cloud manifest bundle.
-      - REGISTRATIONS__MANIFEST_PATHS=/monorepo/andy-auth/config/registration.json:/monorepo/andy-rbac/config/registration.json:/monorepo/andy-containers/config/registration.json:/monorepo/andy-docs/config/registration.json:/monorepo/andy-code-index/config/registration.json:/monorepo/andy-issues/config/registration.json:/monorepo/andy-agents/config/registration.json:/monorepo/andy-tasks/config/registration.json:/monorepo/andy-policies/config/registration.json:/monorepo/andy-settings/config/registration.json:/monorepo/andy-models/config/registration.json
+      - REGISTRATIONS__MANIFEST_PATHS=/monorepo/andy-auth/config/registration.json:/monorepo/andy-rbac/config/registration.json:/monorepo/andy-containers/config/registration.json:/monorepo/andy-docs/config/registration.json:/monorepo/andy-code-index/config/registration.json:/monorepo/andy-issues/config/registration.json:/monorepo/andy-agents/config/registration.json:/monorepo/andy-tasks/config/registration.json:/monorepo/andy-policies/config/registration.json:/monorepo/andy-settings/config/registration.json:/monorepo/andy-models/config/registration.json:/monorepo/andy-mcp-proxy/config/registration.json
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
