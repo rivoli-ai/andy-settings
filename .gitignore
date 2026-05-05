@@ -34,9 +34,11 @@ certs/*.pfx
 
 ## Local packages
 local-packages/*.nupkg
+artifacts/
 
 ## Environment
 .env
 *.env.local
 site/
 examples/rust/target/
+dist/

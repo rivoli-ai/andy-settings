@@ -26,4 +26,13 @@
     <Using Include="Xunit" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Synthetic registration manifests consumed by CustomWebApplicationFactory.
+         Bundled with the test bin/ output so the seeder finds them on every
+         platform — replaces the prior reliance on dev-machine-only paths. -->
+    <Content Include="Fixtures\registrations\*.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
 </Project>

@@ -1,0 +1,21 @@
+{
+  "service": {
+    "name": "test-service-c",
+    "displayName": "Test Service C",
+    "description": "Synthetic registration manifest for andy-settings integration tests. Adds a third manifest so the loader exercises its multi-file path and dedup logic on CI."
+  },
+  "settings": {
+    "definitions": [
+      { "key": "test.serviceC.apiBaseUrl",       "displayName": "Service C API URL",      "description": "Base URL of Service C.",                  "category": "General",      "dataType": "Uri",     "defaultValue": "https://localhost:6301" },
+      { "key": "test.serviceC.logLevel",         "displayName": "Log Level",              "description": "Service-wide log level.",                 "category": "Observability","dataType": "String",  "defaultValue": "Information" },
+      { "key": "test.serviceC.tracingEnabled",   "displayName": "Tracing Enabled",        "description": "Emit OpenTelemetry traces.",              "category": "Observability","dataType": "Boolean", "defaultValue": true },
+      { "key": "test.serviceC.dbPoolSize",       "displayName": "DB Pool Size",           "description": "Outbound DB connection pool size.",       "category": "Performance",  "dataType": "Integer", "defaultValue": 16 },
+      { "key": "test.serviceC.maintenanceWindow","displayName": "Maintenance Window",     "description": "Cron expression for scheduled downtime.","category": "Operations",   "dataType": "String",  "defaultValue": "0 3 * * *" },
+      { "key": "test.serviceC.retentionDays",    "displayName": "Retention (days)",       "description": "Audit retention horizon.",                "category": "Compliance",   "dataType": "Integer", "defaultValue": 365, "allowedScopes": ["tenant"] },
+      { "key": "test.serviceC.allowDelete",      "displayName": "Allow Delete",           "description": "Permit hard-delete operations.",          "category": "Security",     "dataType": "Boolean", "defaultValue": false },
+      { "key": "test.serviceC.webhookUrl",       "displayName": "Webhook URL",            "description": "Outbound event-notification URL.",        "category": "Integrations", "dataType": "Uri" },
+      { "key": "test.serviceC.webhookSecret",    "displayName": "Webhook Secret",         "description": "HMAC key for webhook signing.",           "category": "Secrets",      "dataType": "String",  "isSecret": true },
+      { "key": "test.serviceC.bannerMessage",    "displayName": "Banner Message",         "description": "Optional UI banner text.",                "category": "UX",           "dataType": "String",  "defaultValue": "" }
+    ]
+  }
+}

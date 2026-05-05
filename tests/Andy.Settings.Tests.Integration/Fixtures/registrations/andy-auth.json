@@ -1,0 +1,43 @@
+{
+  "service": {
+    "name": "andy-auth",
+    "displayName": "Andy Auth",
+    "description": "Vendored copy of andy-auth/config/registration.json (settings block only). Provides the real definition keys integration tests reference (andy.auth.tokenLifetimeMinutes). If the upstream manifest changes meaningfully, refresh this file."
+  },
+  "settings": {
+    "definitions": [
+      {
+        "key": "andy.auth.authority",
+        "displayName": "Auth Authority URL",
+        "description": "OIDC authority URL",
+        "category": "General",
+        "dataType": "Uri",
+        "defaultValue": "https://localhost:5001"
+      },
+      {
+        "key": "andy.auth.audience",
+        "displayName": "Auth Audience",
+        "description": "Expected JWT audience",
+        "category": "General",
+        "dataType": "String",
+        "defaultValue": "urn:andy-auth-api"
+      },
+      {
+        "key": "andy.auth.requireHttpsMetadata",
+        "displayName": "Require HTTPS Metadata",
+        "description": "Require HTTPS for OIDC metadata",
+        "category": "Security",
+        "dataType": "Boolean",
+        "defaultValue": false
+      },
+      {
+        "key": "andy.auth.tokenLifetimeMinutes",
+        "displayName": "Token Lifetime",
+        "description": "Access token lifetime in minutes",
+        "category": "Security",
+        "dataType": "Integer",
+        "defaultValue": 60
+      }
+    ]
+  }
+}
