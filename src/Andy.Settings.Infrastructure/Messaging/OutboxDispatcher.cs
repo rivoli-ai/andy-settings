@@ -92,11 +92,20 @@ public sealed class OutboxDispatcher : BackgroundService
 
         var now = DateTimeOffset.UtcNow;
 
-        var pending = await db.Set<OutboxEntry>()
+        // Fetch unordered then sort in-memory. SQLite (used in the
+        // Conductor-embedded deployment) refuses to ORDER BY
+        // DateTimeOffset server-side; the batch cap bounds the working
+        // set so the client-side sort is cheap. Take(BatchSize * 2) so
+        // we don't miss freshly-inserted older rows under a steady
+        // burst — still bounded.
+        var rawPending = await db.Set<OutboxEntry>()
             .Where(e => e.PublishedAt == null)
+            .Take(_options.BatchSize * 2)
+            .ToListAsync(ct);
+        var pending = rawPending
             .OrderBy(e => e.CreatedAt)
             .Take(_options.BatchSize)
-            .ToListAsync(ct);
+            .ToList();
 
         if (pending.Count == 0)
         {
