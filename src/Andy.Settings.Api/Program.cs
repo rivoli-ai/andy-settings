@@ -3,6 +3,7 @@ using Andy.Settings.Api.Data;
 using Andy.Settings.Api.Services;
 using Andy.Settings.Application.Interfaces;
 using Andy.Settings.Infrastructure.Data;
+using Andy.Settings.Infrastructure.Messaging;
 using Andy.Settings.Infrastructure.Repositories;
 using Andy.Settings.Infrastructure.Services;
 using Andy.Settings.Infrastructure.Telemetry;
@@ -36,6 +37,21 @@ builder.Services.AddControllers()
 
 // ── EF Core ─────────────────────────────────────────────────────────────────
 builder.Services.AddSettingsDbContext(builder.Configuration);
+
+// ── Messaging (ADR 0001 — Epic AL) ──────────────────────────────────────────
+// InMemory is the default for `dotnet run` and tests. NATS is required
+// in every other environment per AK1; the guard below trips at boot if
+// production config silently fell back to InMemory.
+var messagingProvider = builder.Configuration["Messaging:Provider"] ?? "InMemory";
+if (!builder.Environment.IsDevelopment()
+    && !string.Equals(messagingProvider, "Nats", StringComparison.OrdinalIgnoreCase))
+{
+    throw new InvalidOperationException(
+        $"Messaging:Provider must be 'Nats' in {builder.Environment.EnvironmentName}. " +
+        $"Got '{messagingProvider}'. In-memory bus is only valid in Development. " +
+        "Set Messaging__Provider=Nats and Messaging__Nats__Url on the host.");
+}
+builder.Services.AddSettingsMessaging(builder.Configuration, builder.Environment);
 
 // ── Data Protection (secret encryption) ─────────────────────────────────────
 builder.Services.AddDataProtection();

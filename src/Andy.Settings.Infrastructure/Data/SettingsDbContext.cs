@@ -12,6 +12,8 @@ public class SettingsDbContext : DbContext
     public DbSet<SettingAssignment> SettingAssignments => Set<SettingAssignment>();
     public DbSet<EncryptedSecret> EncryptedSecrets => Set<EncryptedSecret>();
     public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
+    public DbSet<OutboxEntry> Outbox => Set<OutboxEntry>();
+    public DbSet<SeenMessage> SeenMessages => Set<SeenMessage>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -84,6 +86,32 @@ public class SettingsDbContext : DbContext
             entity.Property(e => e.ActorType).HasMaxLength(64);
             entity.Property(e => e.ActorId).HasMaxLength(256);
             entity.Property(e => e.CorrelationId).HasMaxLength(128);
+        });
+
+        // OutboxEntry — transactional outbox per ADR 0001 §3.
+        modelBuilder.Entity<OutboxEntry>(entity =>
+        {
+            entity.ToTable("Outbox");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Subject).IsRequired().HasMaxLength(256);
+            entity.Property(e => e.PayloadType).HasMaxLength(256);
+            entity.Property(e => e.PayloadJson).IsRequired();
+            entity.Property(e => e.LastError).HasMaxLength(2000);
+
+            // Composite index over the dispatcher's hot query:
+            //   WHERE PublishedAt IS NULL ORDER BY CreatedAt
+            // Plain (non-filtered) so the same DDL works on Postgres and SQLite.
+            entity.HasIndex(e => new { e.PublishedAt, e.CreatedAt });
+            entity.HasIndex(e => e.CorrelationId);
+        });
+
+        // SeenMessage — consumer-side dedup per ADR 0001 AK3.
+        modelBuilder.Entity<SeenMessage>(entity =>
+        {
+            entity.ToTable("SeenMessages");
+            entity.HasKey(e => e.MsgId);
+            entity.Property(e => e.Subject).IsRequired().HasMaxLength(256);
+            entity.HasIndex(e => e.ExpiresAt);
         });
     }
 }

@@ -10,6 +10,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="Andy.Settings.Tests.Unit" />
+    <InternalsVisibleTo Include="Andy.Settings.Tests.Integration" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.DataProtection" Version="8.0.11" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.11" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.11">
@@ -17,6 +22,7 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="8.0.11" />
+    <PackageReference Include="NATS.Net" Version="2.7.3" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="8.0.11" />
     <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.10.0" />
     <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.10.1" />

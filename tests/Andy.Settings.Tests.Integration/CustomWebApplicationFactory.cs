@@ -1,7 +1,11 @@
 using System.Security.Claims;
 using System.Text.Encodings.Web;
 using Andy.Settings.Api.Data;
+using Andy.Settings.Application.Messaging;
 using Andy.Settings.Infrastructure.Data;
+using Andy.Settings.Infrastructure.Messaging;
+using Andy.Settings.Infrastructure.Messaging.Nats;
+using Microsoft.Extensions.Hosting;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Hosting;
@@ -21,7 +25,12 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
-        builder.UseEnvironment("Testing");
+        // Development bypasses the AK1 fail-loud guard (in-memory bus is
+        // only valid in Development). Program.cs reads Messaging:Provider
+        // before the ConfigureAppConfiguration override below takes
+        // effect, so the env flag is what determines whether the guard
+        // fires.
+        builder.UseEnvironment("Development");
 
         builder.ConfigureAppConfiguration((context, config) =>
         {
@@ -40,11 +49,35 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
                 ["OpenTelemetry:OtlpEndpoint"] = "",
                 ["ConnectionStrings:DefaultConnection"] = "",
                 ["Registrations:ManifestPaths:0"] = fixtureDir,
+                // AK1 guard requires Nats in non-Development envs; "Testing"
+                // would otherwise trip it. The in-memory bus is the right
+                // bus for hermetic API tests — outbox→publish→consume
+                // round-trips don't need a real broker.
+                ["Messaging:Provider"] = "InMemory",
+                // Drop the outbox poll cadence so messaging tests don't
+                // wait a full second for a drain.
+                ["Messaging:Outbox:PollInterval"] = "00:00:00.050",
             });
         });
 
         builder.ConfigureServices(services =>
         {
+            // Force the in-memory bus. The minimal-hosting model reads
+            // Messaging:Provider in Program.cs before the
+            // ConfigureAppConfiguration override above takes effect, so
+            // appsettings.json's "Nats" default may have already wired
+            // NatsMessageBus + NatsStreamProvisioner. Strip them and
+            // register the in-memory bus instead so hermetic tests don't
+            // require a running JetStream.
+            var natsDescriptors = services
+                .Where(d => d.ServiceType == typeof(IMessageBus)
+                         || d.ServiceType == typeof(NatsMessageBus)
+                         || d.ImplementationType == typeof(NatsMessageBus)
+                         || d.ImplementationType == typeof(NatsStreamProvisioner))
+                .ToList();
+            foreach (var d in natsDescriptors) services.Remove(d);
+            services.AddSingleton<IMessageBus, InMemoryMessageBus>();
+
             // Replace DbContext with SQLite in-memory
             var descriptorsToRemove = services
                 .Where(d => d.ServiceType == typeof(DbContextOptions<SettingsDbContext>)
@@ -69,11 +102,14 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
                 return new AllowAllTestPolicyProvider(opts);
             });
 
-            // Seed database
+            // Seed database. Migrate (not EnsureCreated) so the
+            // __EFMigrationsHistory table is populated — Program.cs's
+            // own Migrate() call on Development startup is then a no-op
+            // instead of trying to re-create the same tables.
             var sp = services.BuildServiceProvider();
             using var scope = sp.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<SettingsDbContext>();
-            db.Database.EnsureCreated();
+            db.Database.Migrate();
 
             var seeder = scope.ServiceProvider.GetRequiredService<DataSeeder>();
             seeder.SeedAsync().GetAwaiter().GetResult();
