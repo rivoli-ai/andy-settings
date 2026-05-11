@@ -37,6 +37,7 @@ nav:
   - Architecture: architecture.md
   - Features: features.md
   - Security: security.md
+  - Messaging: messaging.md
   - Implementation: implementation.md
   - Testing: testing.md
   - Stories: stories.md

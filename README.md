@@ -62,6 +62,15 @@ cd client && npm install && npm start
 | Andy Auth | 5001 |
 | Andy RBAC | 5003 |
 
+## Commands and events
+
+andy-settings follows the command / event split codified in [ADR 0001 — Messaging](https://github.com/rivoli-ai/andy-tasks/blob/main/docs/adr/0001-messaging.md):
+
+- **Commands stay on HTTP.** Every imperative — set a value, create a definition, fetch a resolved setting — is a synchronous REST call against the API.
+- **Events go on NATS.** Each successful write enqueues a `config.*.changed` event on the JetStream `ANDY_DOMAIN` stream. Consumers (e.g. `mcp-gateway`) subscribe to the slice that names them; andy-settings never subscribes to itself.
+
+The full event catalog and consumer onboarding guide is in [docs/messaging.md](docs/messaging.md).
+
 ## Documentation
 
 Full documentation: [rivoli-ai.github.io/andy-settings](https://rivoli-ai.github.io/andy-settings/)
@@ -69,5 +78,6 @@ Full documentation: [rivoli-ai.github.io/andy-settings](https://rivoli-ai.github
 - [Architecture](docs/architecture.md) -- system design, domain model, scope resolution
 - [Features](docs/features.md) -- complete feature catalog
 - [Security](docs/security.md) -- auth, RBAC, secret encryption
+- [Messaging](docs/messaging.md) -- NATS event catalog, subscriber onboarding, burst handling
 - [Stories](docs/stories.md) -- implementation backlog (11 epics, ~45 stories)
 - [Examples](docs/examples.md) -- multi-language API/MCP examples
