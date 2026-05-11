@@ -96,6 +96,12 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
+    # softprops/action-gh-release uses GITHUB_TOKEN to call POST
+    # /repos/{owner}/{repo}/releases. The default token is read-only on
+    # `contents`, which manifests as a 403 at the Create-Release step
+    # while the NuGet push earlier in the job succeeds. See #81.
+    permissions:
+      contents: write
 
     steps:
     - name: Download artifacts
