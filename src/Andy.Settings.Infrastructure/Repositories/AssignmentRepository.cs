@@ -1,9 +1,11 @@
 using Andy.Settings.Application.DTOs.Common;
 using Andy.Settings.Application.DTOs.Values;
 using Andy.Settings.Application.Interfaces;
+using Andy.Settings.Application.Messaging.Events;
 using Andy.Settings.Domain.Entities;
 using Andy.Settings.Domain.Enums;
 using Andy.Settings.Infrastructure.Data;
+using Andy.Settings.Infrastructure.Messaging;
 using Microsoft.EntityFrameworkCore;
 
 namespace Andy.Settings.Infrastructure.Repositories;
@@ -41,6 +43,11 @@ public class AssignmentRepository : IAssignmentService
             existing.Version++;
             existing.UpdatedBy = actorId;
             existing.UpdatedAt = DateTimeOffset.UtcNow;
+
+            // Outbox row lands in the same SaveChanges as the assignment
+            // mutation — ADR 0001 §3 transactional outbox.
+            _db.AppendConfigChanged(existing, definition, ConfigEventKind.Updated, dto.ValueJson);
+
             await _db.SaveChangesAsync(ct);
 
             await _audit.RecordAsync(new(Guid.NewGuid(), AuditEventType.Updated,
@@ -65,6 +72,7 @@ public class AssignmentRepository : IAssignmentService
         };
 
         _db.SettingAssignments.Add(entity);
+        _db.AppendConfigChanged(entity, definition, ConfigEventKind.Created, dto.ValueJson);
         await _db.SaveChangesAsync(ct);
 
         await _audit.RecordAsync(new(Guid.NewGuid(), AuditEventType.Created,
@@ -82,6 +90,10 @@ public class AssignmentRepository : IAssignmentService
             ?? throw new KeyNotFoundException($"Assignment '{id}' not found.");
 
         _db.SettingAssignments.Remove(entity);
+        // newValueJson is null on delete — payload's NewValueDigest will
+        // also be null so consumers can disambiguate "deleted" from "set
+        // to empty string" without parsing the subject's kind suffix.
+        _db.AppendConfigChanged(entity, entity.Definition, ConfigEventKind.Deleted, newValueJson: null);
         await _db.SaveChangesAsync(ct);
 
         await _audit.RecordAsync(new(Guid.NewGuid(), AuditEventType.Deleted,
