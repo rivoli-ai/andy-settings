@@ -1,9 +1,11 @@
 using Andy.Settings.Application.DTOs.Audit;
 using Andy.Settings.Application.DTOs.Secrets;
 using Andy.Settings.Application.Interfaces;
+using Andy.Settings.Application.Messaging.Events;
 using Andy.Settings.Domain.Entities;
 using Andy.Settings.Domain.Enums;
 using Andy.Settings.Infrastructure.Data;
+using Andy.Settings.Infrastructure.Messaging;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 
@@ -38,11 +40,19 @@ public class SecretService : ISecretService
                 s.ScopeType == dto.ScopeType &&
                 s.ScopeId == dto.ScopeId, ct);
 
+        // rivoli-ai/conductor#925 (M1.2.1). A first-time write is
+        // `Set`; an overwrite is `Rotated`. Both carry the same
+        // subject (`.updated`) on the wire so existing consumers
+        // (andy-models' SettingsChangeConsumer) don't need to subscribe
+        // to two patterns; the distinct kind survives in the payload's
+        // `Mutation` field for consumers that care.
+        SecretEventKind mutationKind;
         if (existing is not null)
         {
             existing.EncryptedValue = encrypted;
             existing.UpdatedBy = actorId;
             existing.UpdatedAt = DateTimeOffset.UtcNow;
+            mutationKind = SecretEventKind.Rotated;
         }
         else
         {
@@ -58,7 +68,20 @@ public class SecretService : ISecretService
                 UpdatedAt = DateTimeOffset.UtcNow
             };
             _db.EncryptedSecrets.Add(existing);
+            mutationKind = SecretEventKind.Set;
         }
+
+        // Outbox row lands in the same SaveChangesAsync as the
+        // EncryptedSecret mutation (ADR 0001 §3 — atomicity). The
+        // background OutboxDispatcher picks it up and publishes to
+        // NATS; rolling back the secret mutation also rolls back the
+        // event.
+        _db.AppendSecretChanged(
+            definitionKey: dto.DefinitionKey,
+            definitionId: definition.Id,
+            scopeType: dto.ScopeType,
+            scopeId: dto.ScopeId,
+            kind: mutationKind);
 
         await _db.SaveChangesAsync(ct);
 
@@ -107,7 +130,24 @@ public class SecretService : ISecretService
             .Where(s => s.DefinitionId == definition.Id)
             .ToListAsync(ct);
 
+        // No rows to delete is a no-op — don't publish a phantom event.
+        // Consumers would re-resolve, find no key, and surface a
+        // misleading "key was deleted" signal in their UI.
+        if (secrets.Count == 0) return;
+
         _db.EncryptedSecrets.RemoveRange(secrets);
+
+        // rivoli-ai/conductor#925 (M1.2.1). One event per definition.
+        // Per-scope events would be noisier without buying anything —
+        // consumers invalidate by definition key, not scope. ScopeId
+        // is left null in the payload to signal "all scopes".
+        _db.AppendSecretChanged(
+            definitionKey: definitionKey,
+            definitionId: definition.Id,
+            scopeType: ScopeType.Machine,
+            scopeId: null,
+            kind: SecretEventKind.Deleted);
+
         await _db.SaveChangesAsync(ct);
     }
 
