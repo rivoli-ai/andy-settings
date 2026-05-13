@@ -29,6 +29,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Andy.Settings.Client", "src
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Andy.Settings.Client.TestSupport", "src\Andy.Settings.Client.TestSupport\Andy.Settings.Client.TestSupport.csproj", "{1015C647-998B-4092-95D2-44FB040F75AA}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Andy.Settings.Client.Tests", "tests\Andy.Settings.Client.Tests\Andy.Settings.Client.Tests.csproj", "{BCCDF69F-9F68-4C89-A2DA-7A9DA8824610}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -78,6 +80,10 @@ Global
 		{1015C647-998B-4092-95D2-44FB040F75AA}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{1015C647-998B-4092-95D2-44FB040F75AA}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{1015C647-998B-4092-95D2-44FB040F75AA}.Release|Any CPU.Build.0 = Release|Any CPU
+		{BCCDF69F-9F68-4C89-A2DA-7A9DA8824610}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BCCDF69F-9F68-4C89-A2DA-7A9DA8824610}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BCCDF69F-9F68-4C89-A2DA-7A9DA8824610}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BCCDF69F-9F68-4C89-A2DA-7A9DA8824610}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{E550A352-0C25-4EB8-AE82-4E5660BE188E} = {628ADD4E-B2AC-4940-9EFB-17BA2A143580}
@@ -90,5 +96,6 @@ Global
 		{01CCACAA-528E-4A47-A63D-132B7DD23C22} = {8BFDECD9-DE89-4CCA-9A2E-2DAD8D38DC97}
 		{7012ACDD-514C-4801-BDF6-C674E0459761} = {628ADD4E-B2AC-4940-9EFB-17BA2A143580}
 		{1015C647-998B-4092-95D2-44FB040F75AA} = {628ADD4E-B2AC-4940-9EFB-17BA2A143580}
+		{BCCDF69F-9F68-4C89-A2DA-7A9DA8824610} = {8BFDECD9-DE89-4CCA-9A2E-2DAD8D38DC97}
 	EndGlobalSection
 EndGlobal
