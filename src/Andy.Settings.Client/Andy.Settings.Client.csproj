@@ -22,9 +22,11 @@
 
   <ItemGroup>
     <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+    <InternalsVisibleTo Include="Andy.Settings.Client.Tests" />
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Andy.Auth.M2MClient" Version="2026.5.13-*" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="8.0.0" />
     <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="8.0.0" />
     <PackageReference Include="Microsoft.Extensions.Http" Version="8.0.0" />
