@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using Microsoft.AspNetCore.DataProtection;
 using Andy.Settings.Api.Data;
 using Andy.Settings.Api.Services;
 using Andy.Settings.Application.Interfaces;
@@ -54,7 +55,17 @@ if (!builder.Environment.IsDevelopment()
 builder.Services.AddSettingsMessaging(builder.Configuration, builder.Environment);
 
 // ── Data Protection (secret encryption) ─────────────────────────────────────
-builder.Services.AddDataProtection();
+// Persist the key ring in the DB (DataProtectionKeys table) rather than
+// letting it default to in-memory. Without this every process restart
+// re-keys, and previously-encrypted EncryptedSecret rows fail Unprotect
+// on first read — bricks downstream services (andy-tasks's planner
+// bootstrap, andy-models's provider key resolver, etc.) at cold start.
+// See conductor#1160. SetApplicationName isolates this app's keys from
+// any other DP user that might share the DB (defensive — there isn't
+// one today).
+builder.Services.AddDataProtection()
+    .SetApplicationName("andy-settings")
+    .PersistKeysToDbContext<SettingsDbContext>();
 
 // ── Application services ────────────────────────────────────────────────────
 builder.Services.AddHttpContextAccessor();
