@@ -1,10 +1,11 @@
 using Andy.Settings.Domain.Entities;
 using Andy.Settings.Domain.Enums;
+using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
 namespace Andy.Settings.Infrastructure.Data;
 
-public class SettingsDbContext : DbContext
+public class SettingsDbContext : DbContext, IDataProtectionKeyContext
 {
     public SettingsDbContext(DbContextOptions<SettingsDbContext> options) : base(options) { }
 
@@ -14,6 +15,13 @@ public class SettingsDbContext : DbContext
     public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
     public DbSet<OutboxEntry> Outbox => Set<OutboxEntry>();
     public DbSet<SeenMessage> SeenMessages => Set<SeenMessage>();
+
+    // Persisted Data Protection key ring — see conductor#1160. Without
+    // this, AddDataProtection() generates ephemeral in-memory keys; every
+    // process restart re-keys, and previously-encrypted EncryptedSecret
+    // rows fail Unprotect on first read. The DataProtectionKeys table is
+    // created by the AddDataProtectionKeys migration.
+    public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
