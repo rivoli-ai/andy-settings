@@ -1,4 +1,6 @@
 using System.Text.Json.Serialization;
+using Andy.Settings.Api;
+// HostEnvironmentExtensions.IsEmbedded / IsLocalOrEmbedded
 using Andy.Settings.Api.Data;
 using Andy.Settings.Api.Services;
 using Andy.Settings.Application.Interfaces;
@@ -82,7 +84,11 @@ if (!string.IsNullOrEmpty(andyAuthAuthority))
         {
             options.Authority = andyAuthAuthority;
             options.Audience = audience;
-            options.RequireHttpsMetadata = !builder.Environment.IsDevelopment();
+            // HTTPS metadata off in every non-production mode. Conductor's
+            // embedded mode talks to andy-auth over HTTP via the unified
+            // proxy on port 9100 — without IsLocalOrEmbedded() the JWT
+            // bearer middleware would refuse the discovery document.
+            options.RequireHttpsMetadata = !builder.Environment.IsLocalOrEmbedded();
             if (builder.Environment.IsDevelopment())
             {
                 options.BackchannelHttpHandler = new HttpClientHandler
@@ -238,24 +244,39 @@ builder.Services.AddOpenTelemetry()
 // ═════════════════════════════════════════════════════════════════════════════
 var app = builder.Build();
 
-// ── Development-only startup ────────────────────────────────────────────────
+// ── Development-only chrome (Swagger UI) ────────────────────────────────────
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
+}
 
-    // Auto-migrate
+// ── Schema bootstrap + seed (every non-production mode) ─────────────────────
+// Embedded needs schema-on-first-boot too — without this the bundled
+// SQLite DB starts empty and every settings read 500s. The
+// `IsRelational()` guard keeps integration tests (InMemory provider)
+// from tripping on `Migrate()`.
+if (app.Environment.IsLocalOrEmbedded())
+{
     using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<SettingsDbContext>();
-    db.Database.Migrate();
+    if (db.Database.IsRelational())
+    {
+        db.Database.Migrate();
+    }
 
-    // Seed definitions
     var seeder = scope.ServiceProvider.GetRequiredService<DataSeeder>();
     await seeder.SeedAsync();
 }
 
 // ── Pipeline ────────────────────────────────────────────────────────────────
-app.UseHttpsRedirection();
+// Conductor's embedded mode terminates HTTPS at the unified proxy on
+// port 9100; the in-process Kestrel only ever binds to HTTP. Forcing
+// a redirect would trap every request in a redirect loop.
+if (!app.Environment.IsEmbedded())
+{
+    app.UseHttpsRedirection();
+}
 app.UseCors();
 app.UseStaticFiles();
 app.UseRouting();
