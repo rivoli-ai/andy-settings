@@ -1,6 +1,7 @@
 using Andy.Settings.Domain.Entities;
 using Andy.Settings.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 namespace Andy.Settings.Infrastructure.Data;
 
@@ -14,6 +15,37 @@ public class SettingsDbContext : DbContext
     public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
     public DbSet<OutboxEntry> Outbox => Set<OutboxEntry>();
     public DbSet<SeenMessage> SeenMessages => Set<SeenMessage>();
+
+    protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
+    {
+        base.ConfigureConventions(configurationBuilder);
+
+        // SQLite stores `DateTimeOffset` as TEXT, which orders
+        // lexicographically and breaks every WHERE/ORDER BY that compares
+        // a column to a `DateTimeOffset` value (or asks "is this < now").
+        // SeenMessagesCleanupJob hit this every tick under the
+        // Conductor-embedded SQLite provider:
+        //   System.InvalidOperationException: The LINQ expression
+        //   'DbSet<SeenMessage>().Where(s => s.ExpiresAt < __now_0)'
+        //   could not be translated.
+        // Other queries are exposed to the same wall — OutboxDispatcher
+        // ORDER BY CreatedAt, AuditEvent date-range filters, etc. Rather
+        // than patch each call site, bind a binary converter
+        // (`DateTimeOffset` <-> `long`) at the convention level so every
+        // DateTimeOffset column on every entity in this DbContext gets
+        // the same treatment. Avoids the whack-a-mole "I missed one"
+        // pattern. Postgres handles DateTimeOffset natively via
+        // `timestamp with time zone`, so the conversion is gated to
+        // SQLite only. Same shape as the fix in andy-rbac#74 /
+        // andy-agents#174.
+        if (Database.IsSqlite())
+        {
+            configurationBuilder.Properties<DateTimeOffset>()
+                .HaveConversion<DateTimeOffsetToBinaryConverter>();
+            configurationBuilder.Properties<DateTimeOffset?>()
+                .HaveConversion<DateTimeOffsetToBinaryConverter>();
+        }
+    }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
