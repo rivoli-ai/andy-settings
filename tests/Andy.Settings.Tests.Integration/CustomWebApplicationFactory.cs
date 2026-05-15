@@ -21,7 +21,21 @@ namespace Andy.Settings.Tests.Integration;
 
 public class CustomWebApplicationFactory : WebApplicationFactory<Program>
 {
-    private SqliteConnection? _connection;
+    // Per-instance shared in-memory SQLite database. `Mode=Memory&Cache=Shared`
+    // lets every DbContext open its own physical connection (so EF Core's
+    // UDF registration/cleanup is per-context, not interleaved across
+    // sibling contexts on the same connection — the root cause of the
+    // "unable to delete/modify user-function due to active statements"
+    // flake that the global DateTimeOffsetToBinaryConverter exposed once
+    // OutboxDispatcher's 50ms poll started racing the HTTP request
+    // pipeline against the same `:memory:` connection). The keep-alive
+    // connection pins the in-memory DB so it isn't garbage-collected when
+    // no other connection is open. Each factory instance gets a unique
+    // database name so xUnit's parallel class execution can't collide.
+    // Mirrors andy-agents' SqliteTestWebAppFactory (issue #154).
+    private readonly string _connectionString =
+        $"Data Source=file:integration-tests-{Guid.NewGuid():N}?Mode=Memory&Cache=Shared";
+    private SqliteConnection? _keepAlive;
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -85,11 +99,11 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
                 .ToList();
             foreach (var d in descriptorsToRemove) services.Remove(d);
 
-            _connection = new SqliteConnection("Data Source=:memory:");
-            _connection.Open();
+            _keepAlive = new SqliteConnection(_connectionString);
+            _keepAlive.Open();
 
             services.AddDbContext<SettingsDbContext>(options =>
-                options.UseSqlite(_connection));
+                options.UseSqlite(_connectionString));
 
             // Bypass authentication: auto-succeed with a test user
             services.AddAuthentication("Test")
@@ -119,7 +133,7 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
     protected override void Dispose(bool disposing)
     {
         base.Dispose(disposing);
-        if (disposing) _connection?.Dispose();
+        if (disposing) _keepAlive?.Dispose();
     }
 }
 
