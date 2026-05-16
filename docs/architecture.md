@@ -59,16 +59,20 @@ External Integrations:
 ```text
 andy-settings/
 ├── src/
-│   ├── Andy.Settings.Domain/           # Entities, enums (no dependencies)
-│   ├── Andy.Settings.Application/      # Interfaces, DTOs, options (→ Domain)
-│   ├── Andy.Settings.Infrastructure/   # EF Core, repositories, services (→ Domain, Application)
-│   ├── Andy.Settings.Api/              # ASP.NET Core REST + MCP + Swagger (→ all)
-│   └── Andy.Settings.Shared/           # Shared types for client libraries
+│   ├── Andy.Settings.Domain/             # Entities, enums (no dependencies)
+│   ├── Andy.Settings.Application/        # Interfaces, DTOs, options (→ Domain)
+│   ├── Andy.Settings.Infrastructure/     # EF Core, repositories, services (→ Domain, Application)
+│   ├── Andy.Settings.Api/                # ASP.NET Core REST + MCP + Swagger (→ all)
+│   ├── Andy.Settings.Client/             # Consumer HTTP client + OBO/M2M token providers
+│   ├── Andy.Settings.Client.TestSupport/ # In-memory fakes for client consumers
+│   └── Andy.Settings.Shared/             # Shared types for client libraries
 ├── tools/
-│   └── Andy.Settings.Cli/             # CLI tool
+│   └── Andy.Settings.Cli/                # CLI tool
 ├── tests/
-│   ├── Andy.Settings.Tests.Unit/      # Unit tests
-│   └── Andy.Settings.Tests.Integration/ # Integration tests
+│   ├── Andy.Settings.Tests.Unit/         # Unit tests
+│   ├── Andy.Settings.Tests.Integration/  # Integration tests
+│   ├── Andy.Settings.Api.Tests/          # API tests
+│   └── Andy.Settings.Client.Tests/       # Client library tests
 ├── client/                            # Angular SPA
 ├── examples/                          # Multi-language API/MCP examples
 ├── docs/                              # MkDocs documentation

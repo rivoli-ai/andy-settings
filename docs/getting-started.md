@@ -88,16 +88,20 @@ cd client && npx ng test --watch=false --browsers=ChromeHeadless
 ```
 andy-settings/
 ├── src/
-│   ├── Andy.Settings.Domain/           # Entities, enums
-│   ├── Andy.Settings.Application/      # Interfaces, DTOs, options
-│   ├── Andy.Settings.Infrastructure/   # EF Core, repositories, services
-│   ├── Andy.Settings.Api/              # REST + MCP + Swagger
-│   └── Andy.Settings.Shared/           # Shared types
+│   ├── Andy.Settings.Domain/             # Entities, enums
+│   ├── Andy.Settings.Application/        # Interfaces, DTOs, options
+│   ├── Andy.Settings.Infrastructure/     # EF Core, repositories, services
+│   ├── Andy.Settings.Api/                # REST + MCP + Swagger
+│   ├── Andy.Settings.Client/             # Consumer HTTP client + OBO/M2M token providers
+│   ├── Andy.Settings.Client.TestSupport/ # In-memory fakes for client consumers
+│   └── Andy.Settings.Shared/             # Shared types
 ├── tools/
-│   └── Andy.Settings.Cli/             # CLI tool
+│   └── Andy.Settings.Cli/                # CLI tool
 ├── tests/
 │   ├── Andy.Settings.Tests.Unit/
-│   └── Andy.Settings.Tests.Integration/
+│   ├── Andy.Settings.Tests.Integration/
+│   ├── Andy.Settings.Api.Tests/
+│   └── Andy.Settings.Client.Tests/
 ├── client/                            # Angular 18 SPA
 ├── examples/                          # Multi-language examples
 ├── docs/                              # MkDocs documentation
