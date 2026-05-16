@@ -7,16 +7,20 @@ Centralized configuration and settings management for the Andy ecosystem.
 ```
 andy-settings/
 ├── src/
-│   ├── Andy.Settings.Domain/           # Entities, enums (no dependencies)
-│   ├── Andy.Settings.Application/      # Interfaces, DTOs, options (-> Domain)
-│   ├── Andy.Settings.Infrastructure/   # EF Core, repositories, services (-> Domain, Application)
-│   ├── Andy.Settings.Api/              # ASP.NET Core REST + MCP + Swagger (-> all)
-│   └── Andy.Settings.Shared/           # Shared types
+│   ├── Andy.Settings.Domain/             # Entities, enums (no dependencies)
+│   ├── Andy.Settings.Application/        # Interfaces, DTOs, options (-> Domain)
+│   ├── Andy.Settings.Infrastructure/     # EF Core, repositories, services (-> Domain, Application)
+│   ├── Andy.Settings.Api/                # ASP.NET Core REST + MCP + Swagger (-> all)
+│   ├── Andy.Settings.Client/             # Consumer HTTP client + OBO/M2M token providers
+│   ├── Andy.Settings.Client.TestSupport/ # In-memory fakes for client consumers
+│   └── Andy.Settings.Shared/             # Shared types
 ├── tools/
-│   └── Andy.Settings.Cli/             # CLI tool (System.CommandLine + Spectre.Console)
+│   └── Andy.Settings.Cli/                # CLI tool (System.CommandLine + Spectre.Console)
 ├── tests/
-│   ├── Andy.Settings.Tests.Unit/      # Unit tests (xUnit, Moq, FluentAssertions)
-│   └── Andy.Settings.Tests.Integration/ # Integration tests (WebApplicationFactory)
+│   ├── Andy.Settings.Tests.Unit/         # Unit tests (xUnit, Moq, FluentAssertions)
+│   ├── Andy.Settings.Tests.Integration/  # Integration tests (WebApplicationFactory)
+│   ├── Andy.Settings.Api.Tests/          # API tests
+│   └── Andy.Settings.Client.Tests/       # Client library tests
 ├── client/                            # Angular 18 SPA
 ├── examples/                          # Multi-language API/MCP examples (C#, Python, JS, Go, Rust, PowerShell)
 ├── docs/                              # MkDocs Material documentation
