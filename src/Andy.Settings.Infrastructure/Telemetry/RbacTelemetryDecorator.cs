@@ -28,20 +28,33 @@ public static class RbacTelemetryExtensions
     {
         var resultTag = allowed ? "allowed" : "denied";
 
-        // Increment the RBAC checks counter
+        // Increment the RBAC checks counter. OT7 (rivoli-ai/conductor#1265):
+        // dimensions renamed under `andy.rbac.*` per
+        // docs/semconv-compliance.md. Legacy `permission` / `result`
+        // dimensions dual-emit during the 0.2.4 transition window and
+        // disappear in Andy.Telemetry 0.3.0.
         SettingsTelemetry.RbacChecks.Add(1,
-            new KeyValuePair<string, object?>("permission", permission),
-            new KeyValuePair<string, object?>("result", resultTag));
+            new KeyValuePair<string, object?>("andy.rbac.permission", permission),
+            new KeyValuePair<string, object?>("andy.rbac.result", resultTag),
+            new KeyValuePair<string, object?>("permission", permission), // deprecated
+            new KeyValuePair<string, object?>("result", resultTag));     // deprecated
 
         if (!allowed)
         {
             // Increment the RBAC denials counter for denied checks
             SettingsTelemetry.RbacDenials.Add(1,
-                new KeyValuePair<string, object?>("permission", permission));
+                new KeyValuePair<string, object?>("andy.rbac.permission", permission),
+                new KeyValuePair<string, object?>("permission", permission)); // deprecated
         }
 
         // Create an activity span for distributed tracing
         using var activity = SettingsTelemetry.ActivitySource.StartActivity("rbac.check");
+        activity?.SetTag("andy.rbac.permission", permission);
+        activity?.SetTag("andy.rbac.user_id", userId);
+        activity?.SetTag("andy.rbac.scope_type", scopeType);
+        activity?.SetTag("andy.rbac.scope_id", scopeId);
+        activity?.SetTag("andy.rbac.result", resultTag);
+        // Legacy `rbac.*` names continue to emit for one release.
         activity?.SetTag("rbac.permission", permission);
         activity?.SetTag("rbac.user_id", userId);
         activity?.SetTag("rbac.scope_type", scopeType);
