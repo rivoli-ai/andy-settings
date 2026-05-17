@@ -65,10 +65,18 @@ public sealed class NatsMessageBus : IMessageBus, IAsyncDisposable
     {
         if (headers.ExceedsGenerationLimit)
         {
+            // OT7 (rivoli-ai/conductor#1265). Tags renamed to semconv
+            // messaging.* + peer.service per docs/semconv-compliance.md.
+            // Legacy tags dual-emit; removed in Andy.Telemetry 0.3.0.
+            var subjectRoot = SubjectRoot(subject);
             _generationBreachCounter.Add(1,
-                new KeyValuePair<string, object?>("service", "andy-settings"),
-                new KeyValuePair<string, object?>("direction", "publish"),
-                new KeyValuePair<string, object?>("subject_root", SubjectRoot(subject)));
+                new KeyValuePair<string, object?>("peer.service", "andy-settings"),
+                new KeyValuePair<string, object?>("messaging.operation.name", "publish"),
+                new KeyValuePair<string, object?>("messaging.destination.name", subjectRoot),
+                new KeyValuePair<string, object?>("messaging.system", "nats"),
+                new KeyValuePair<string, object?>("service", "andy-settings"), // deprecated
+                new KeyValuePair<string, object?>("direction", "publish"),      // deprecated
+                new KeyValuePair<string, object?>("subject_root", subjectRoot)); // deprecated
             _logger.LogError(
                 "Dropping message {MsgId} on {Subject} — generation {Gen} exceeds limit {Max}. " +
                 "Correlation: {CorrId} Causation: {CausedBy}",
@@ -131,10 +139,17 @@ public sealed class NatsMessageBus : IMessageBus, IAsyncDisposable
 
             if (parsed.ExceedsGenerationLimit)
             {
+                // OT7 (rivoli-ai/conductor#1265). Dual-emit semconv +
+                // legacy tags. See docs/semconv-compliance.md.
+                var subjectRoot = SubjectRoot(jsMsg.Subject);
                 _generationBreachCounter.Add(1,
-                    new KeyValuePair<string, object?>("service", "andy-settings"),
-                    new KeyValuePair<string, object?>("direction", "consume"),
-                    new KeyValuePair<string, object?>("subject_root", SubjectRoot(jsMsg.Subject)));
+                    new KeyValuePair<string, object?>("peer.service", "andy-settings"),
+                    new KeyValuePair<string, object?>("messaging.operation.name", "consume"),
+                    new KeyValuePair<string, object?>("messaging.destination.name", subjectRoot),
+                    new KeyValuePair<string, object?>("messaging.system", "nats"),
+                    new KeyValuePair<string, object?>("service", "andy-settings"), // deprecated
+                    new KeyValuePair<string, object?>("direction", "consume"),      // deprecated
+                    new KeyValuePair<string, object?>("subject_root", subjectRoot)); // deprecated
                 _logger.LogError(
                     "Dropping message {MsgId} on {Subject} — generation {Gen} exceeds limit {Max}. " +
                     "Correlation: {CorrId} Causation: {CausedBy}",
