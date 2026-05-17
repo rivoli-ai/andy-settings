@@ -24,10 +24,23 @@
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="8.0.11" />
     <PackageReference Include="NATS.Net" Version="2.7.3" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="8.0.11" />
-    <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.10.0" />
-    <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.10.1" />
-    <PackageReference Include="OpenTelemetry.Exporter.Console" Version="1.10.0" />
-    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.15.3" />
+    <!-- OT5 (rivoli-ai/conductor#1263): Andy.Telemetry pulls in OTel
+         transitively via the Api project; Infrastructure only needs the
+         abstractions from System.Diagnostics + System.Diagnostics.Metrics
+         (in the BCL) for the SettingsTelemetry / RbacTelemetryDecorator
+         classes below. The standalone OpenTelemetry hosting / exporter /
+         AspNetCore packages were removed here because nothing in this
+         project actually consumes them — they only ever shipped because
+         OT4 hadn't audited the dependency tree. The Configuration.Binder
+         + Configuration.Json packages below replace what those OTel
+         packages transitively provided to MessagingExtensions /
+         DatabaseProviderExtensions / SettingsDbContextFactory. -->
+    <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="8.0.2" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="8.0.1" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.1" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="8.0.1" />
   </ItemGroup>
 
 </Project>
