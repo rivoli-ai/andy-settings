@@ -13,6 +13,7 @@
   <ItemGroup>
     <PackageReference Include="Andy.Auth" Version="2025.11.17-rc.1" />
     <PackageReference Include="Andy.Rbac.Client" Version="1.0.0" />
+    <PackageReference Include="Andy.Telemetry" Version="0.2.1" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.11" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="8.0.11" />
     <PackageReference Include="ModelContextProtocol" Version="0.4.0-preview.3" />
@@ -21,12 +22,11 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="OpenTelemetry.Exporter.Console" Version="1.10.0" />
-    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.15.3" />
-    <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.10.0" />
-    <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.10.1" />
+    <!-- OT5 (rivoli-ai/conductor#1263): tracing/metrics via Andy.Telemetry.
+         EF Core tracing stays here — the shared library deliberately doesn't
+         bundle it (service-specific). Console exporter removed; services
+         export OTLP only per OT5 scope. -->
     <PackageReference Include="OpenTelemetry.Instrumentation.EntityFrameworkCore" Version="1.0.0-beta.12" />
-    <PackageReference Include="OpenTelemetry.Instrumentation.Http" Version="1.10.0" />
     <PackageReference Include="Serilog.AspNetCore" Version="8.0.3" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.8.1" />
   </ItemGroup>
