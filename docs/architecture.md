@@ -6,7 +6,7 @@ Andy Settings is the configuration control plane for the Andy ecosystem. It prov
 
 The architecture supports two deployment modes:
 
-1. **Embedded Mode** -- runs inside the Conductor macOS app as the 8th embedded .NET service (port 9107, prefix `/settings`, SQLite backend)
+1. **Embedded Mode** -- runs inside the Conductor macOS app as an embedded .NET service (port 9111, prefix `/settings`, SQLite backend)
 2. **Shared Service Mode** -- hosted API, Angular client, PostgreSQL, team/user scopes, service-to-service consumption
 
 ## Architectural Principles
@@ -50,7 +50,7 @@ External Integrations:
 - Conductor (macOS host app, Swift, embeds andy-settings as service)
 - Andy Auth (OIDC / OAuth2)
 - Andy RBAC (authorization)
-- Andy Containers / DevPilot / Code Index / Docs (consumers)
+- Andy Containers / Issues / Code Index / Docs (consumers)
 - MCP clients / AI assistants
 ```
 
@@ -176,11 +176,11 @@ This powers the "why is this value active?" UX in the API, CLI, MCP, and web UI.
 
 ## Conductor Integration
 
-Andy Settings runs as the 8th embedded .NET service inside the Conductor macOS app.
+Andy Settings runs as an embedded .NET service inside the Conductor macOS app.
 
 | Property | Value |
 |----------|-------|
-| Port | 9107 |
+| Port | 9111 |
 | Proxy prefix | `/settings` |
 | Database | SQLite at `~/Library/Application Support/ai.rivoli.conductor/db/andy-settings.sqlite` |
 | Service config | `SettingsServiceConfig` in `Conductor/Core/ServiceHost/Services/` |
@@ -188,12 +188,12 @@ Andy Settings runs as the 8th embedded .NET service inside the Conductor macOS a
 Integration points in Conductor:
 
 1. **ServiceOrchestrator** launches andy-settings after auth + rbac (same as other services)
-2. **UnifiedProxy** routes `/settings/*` requests to port 9107
+2. **UnifiedProxy** routes `/settings/*` requests to port 9111
 3. **SettingsService** protocol in Swift calls the API via `APIClient`
 4. **ActionBus** integration: `UpdateSettingsAction` for audit trail
 5. **AppPreferences** (UserDefaults) remains for UI chrome; andy-settings handles all service/team/user configuration
 
-Consumer services (containers, code-index, devpilot, docs) read their settings from andy-settings at startup and optionally subscribe for live updates.
+Consumer services (containers, code-index, issues, docs) read their settings from andy-settings at startup and optionally subscribe for live updates.
 
 ## Storage Model
 

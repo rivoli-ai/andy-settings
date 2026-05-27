@@ -54,11 +54,11 @@ Secret-bearing settings are encrypted using ASP.NET Core Data Protection API (AE
 
 ### 4. Conductor Integration
 
-Andy Settings runs as the 8th embedded .NET service inside Conductor:
+Andy Settings runs as an embedded .NET service inside Conductor:
 
-- Port 9107, proxy prefix `/settings`
+- Port 9111, proxy prefix `/settings`
 - SQLite backend at `~/Library/Application Support/ai.rivoli.conductor/db/`
-- Consumer services (auth, rbac, containers, code-index, devpilot, docs) read configuration from andy-settings
+- Consumer services (auth, rbac, containers, code-index, issues, docs) read configuration from andy-settings
 - Conductor's ActionBus integration for audit trail
 - AppPreferences (UserDefaults) remains for UI chrome only
 
@@ -151,7 +151,7 @@ Serves all Andy services from one configuration authority:
 - `andy.rbac.*`
 - `andy.containers.*`
 - `andy.codeindex.*`
-- `andy.devpilot.*`
+- `andy.issues.*`
 - `andy.docs.*`
 - `andy.settings.*`
 
