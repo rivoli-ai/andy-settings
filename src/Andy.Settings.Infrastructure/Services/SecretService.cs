@@ -8,6 +8,8 @@ using Andy.Settings.Infrastructure.Data;
 using Andy.Settings.Infrastructure.Messaging;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using System.Security.Cryptography;
 
 namespace Andy.Settings.Infrastructure.Services;
 
@@ -16,12 +18,14 @@ public class SecretService : ISecretService
     private readonly SettingsDbContext _db;
     private readonly IDataProtector _protector;
     private readonly IAuditService _audit;
+    private readonly ILogger<SecretService> _logger;
 
-    public SecretService(SettingsDbContext db, IDataProtectionProvider dataProtectionProvider, IAuditService audit)
+    public SecretService(SettingsDbContext db, IDataProtectionProvider dataProtectionProvider, IAuditService audit, ILogger<SecretService> logger)
     {
         _db = db;
         _protector = dataProtectionProvider.CreateProtector("AndySettings.Secrets");
         _audit = audit;
+        _logger = logger;
     }
 
     public async Task<SecretMetadataDto> SetSecretAsync(SetSecretDto dto, string? actorId, CancellationToken ct = default)
@@ -107,7 +111,30 @@ public class SecretService : ISecretService
         if (secret is null)
             return null;
 
-        return _protector.Unprotect(secret.EncryptedValue);
+        try
+        {
+            return _protector.Unprotect(secret.EncryptedValue);
+        }
+        catch (CryptographicException ex)
+        {
+            // The stored ciphertext can't be decrypted with the current
+            // DataProtection key ring — the master key was rotated or
+            // regenerated (historically because keys were ephemeral; see
+            // the PersistKeysToFileSystem fix in Program.cs). Treat the
+            // secret as ABSENT rather than throwing a 500: a single
+            // undecryptable secret must not take down callers. e.g.
+            // andy-tasks' PlannerSettingsBootstrapper fetches a planner
+            // secret at boot and a 500 here crashed its whole host.
+            // Returning null lets the caller degrade; the operator
+            // re-sets the secret to repair it (and it now persists).
+            _logger.LogWarning(
+                ex,
+                "[SECRET-UNDECRYPTABLE] Secret for definition '{Definition}' (scope {ScopeType}/{ScopeId}) " +
+                "could not be decrypted with the current DataProtection key; treating as absent. " +
+                "Re-set the secret to repair it.",
+                dto.DefinitionKey, dto.ScopeType, dto.ScopeId);
+            return null;
+        }
     }
 
     public async Task<SecretMetadataDto> RotateSecretAsync(RotateSecretDto dto, string? actorId, CancellationToken ct = default)

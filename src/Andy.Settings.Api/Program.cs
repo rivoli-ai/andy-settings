@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using Microsoft.AspNetCore.DataProtection;
 using Andy.Settings.Api.Data;
 using Andy.Settings.Api.Services;
 using Andy.Settings.Application.Interfaces;
@@ -53,7 +54,23 @@ if (!builder.Environment.IsDevelopment()
 builder.Services.AddSettingsMessaging(builder.Configuration, builder.Environment);
 
 // ── Data Protection (secret encryption) ─────────────────────────────────────
-builder.Services.AddDataProtection();
+// Persist the key ring to a STABLE on-disk location. Bare
+// AddDataProtection() falls back to EPHEMERAL keys when it can't find a
+// writable user-profile key store — and an ephemeral key ring is
+// regenerated on every restart, so secrets encrypted in a prior run
+// become permanently undecryptable ("payload was invalid" → 500). That
+// took down andy-tasks at startup. A fixed path also means the embedded
+// app and the conductord daemon (running as the same user) share one key
+// ring, so a secret survives the move between hosting modes.
+// Override via ANDY_DATAPROTECTION_KEYS_DIR (e.g. a mounted volume in
+// the Dockerized conductord deployment).
+var dataProtectionKeysDir = Environment.GetEnvironmentVariable("ANDY_DATAPROTECTION_KEYS_DIR")
+    ?? Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+        ".andy", "dataprotection-keys");
+Directory.CreateDirectory(dataProtectionKeysDir);
+builder.Services.AddDataProtection()
+    .PersistKeysToFileSystem(new DirectoryInfo(dataProtectionKeysDir));
 
 // ── Application services ────────────────────────────────────────────────────
 builder.Services.AddHttpContextAccessor();

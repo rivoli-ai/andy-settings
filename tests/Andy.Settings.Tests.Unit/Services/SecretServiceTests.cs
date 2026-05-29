@@ -8,6 +8,7 @@ using Andy.Settings.Infrastructure.Services;
 using FluentAssertions;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 
 namespace Andy.Settings.Tests.Unit.Services;
@@ -30,7 +31,7 @@ public class SecretServiceTests : IDisposable
         _auditMock.Setup(a => a.RecordAsync(It.IsAny<AuditEventDto>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
-        _sut = new SecretService(_db, dataProtectionProvider, _auditMock.Object);
+        _sut = new SecretService(_db, dataProtectionProvider, _auditMock.Object, NullLogger<SecretService>.Instance);
     }
 
     public void Dispose()
@@ -99,6 +100,40 @@ public class SecretServiceTests : IDisposable
         var result = await _sut.GetSecretAsync(getDto);
 
         result.Should().Be("super-secret-password");
+    }
+
+    [Fact]
+    public async Task GetSecret_WhenCiphertextUndecryptable_ReturnsNull_DoesNotThrow()
+    {
+        // A secret whose ciphertext can't be decrypted with the current
+        // DataProtection key (key rotated/regenerated) must be treated as
+        // ABSENT, not surfaced as a 500. A raw CryptographicException here
+        // crashed andy-tasks' planner bootstrapper at startup.
+        var definition = await SeedDefinition();
+        _db.EncryptedSecrets.Add(new EncryptedSecret
+        {
+            Id = Guid.NewGuid(),
+            DefinitionId = definition.Id,
+            ScopeType = ScopeType.Machine,
+            ScopeId = null,
+            EncryptedValue = "this-is-not-valid-dataprotection-ciphertext",
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        });
+        await _db.SaveChangesAsync();
+
+        var getDto = new GetSecretDto
+        {
+            DefinitionKey = "app.secret.key",
+            ScopeType = ScopeType.Machine
+        };
+
+        Func<Task> act = async () => await _sut.GetSecretAsync(getDto);
+
+        await act.Should().NotThrowAsync(
+            "an undecryptable secret must degrade to absent, not crash callers");
+        (await _sut.GetSecretAsync(getDto)).Should().BeNull(
+            "an undecryptable secret reads as absent so the operator can re-set it");
     }
 
     [Fact]
