@@ -15,6 +15,7 @@ using Andy.Settings.Infrastructure.Services;
 using FluentAssertions;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Xunit;
 
@@ -51,7 +52,7 @@ public class SecretEventOutboxTests : IDisposable
         auditMock.Setup(a => a.RecordAsync(It.IsAny<AuditEventDto>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
-        _sut = new SecretService(_db, dataProtectionProvider, auditMock.Object);
+        _sut = new SecretService(_db, dataProtectionProvider, auditMock.Object, NullLogger<SecretService>.Instance);
     }
 
     public void Dispose() => _db.Dispose();
