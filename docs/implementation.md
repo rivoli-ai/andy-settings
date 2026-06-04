@@ -222,12 +222,14 @@ GET    /api/health
 
 ## Seed Definitions
 
-Ship seed definitions for all Andy services:
+Seed definitions are auto-discovered from each sibling service's `config/registration.json` `settings.definitions` block. Search paths come from the `Registrations:ManifestPaths` config section or the `REGISTRATIONS__MANIFEST_PATHS` environment variable (colon-separated on macOS/Linux, semicolon on Windows); `docker-compose.yml` mounts the monorepo read-only at `/monorepo` and lists every sibling `registration.json` there.
+
+Andy seed definitions today cover all Andy services:
 
 - `andy.auth.*` -- authority, audience, token lifetimes
 - `andy.rbac.*` -- API base URL, application codes, cache TTL
 - `andy.containers.*` -- default provider, resource limits, template paths
 - `andy.codeindex.*` -- embedding provider, model, chunk sizes
-- `andy.devpilot.*` -- LLM provider, model, agent settings
+- `andy.issues.*` -- issue-refinement LLM provider, model, agent settings
 - `andy.docs.*` -- source paths, rendering options
 - `andy.settings.*` -- self-configuration (meta settings)

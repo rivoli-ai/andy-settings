@@ -16,9 +16,9 @@ docker compose up --build
 
 Services will be available at:
 
-- **API**: https://localhost:5300
-- **Swagger**: https://localhost:5300/swagger
-- **PostgreSQL**: localhost:5438
+- **API**: https://localhost:7300
+- **Swagger**: https://localhost:7300/swagger
+- **PostgreSQL**: localhost:7438
 
 ## Native Local Development
 

@@ -14,7 +14,7 @@ Andy Settings provides typed setting definitions, scoped value assignments, encr
 | **Scoped Resolution** | 8-level scope precedence with deterministic resolution and explanation |
 | **Encrypted Secrets** | AES-256-GCM encryption via Data Protection API, RBAC-gated access |
 | **Audit Trail** | Append-only change history with actor, scope, and diff metadata |
-| **Conductor Integration** | Embedded as 8th service in Conductor macOS app (port 9107) |
+| **Conductor Integration** | Embedded service in the Conductor macOS app (port 9111) |
 | **REST + Swagger** | Full CRUD API with OpenAPI documentation |
 | **MCP Tools** | Model Context Protocol tools for AI assistant integration |
 | **CLI** | Command-line tool with table/JSON output and OAuth device flow |
@@ -38,18 +38,20 @@ Andy Settings provides typed setting definitions, scoped value assignments, encr
 
 | Service | URL | Description |
 |---------|-----|-------------|
-| API (HTTPS) | https://localhost:5300 | REST + MCP + Swagger |
-| API (HTTP) | http://localhost:5301 | HTTP access |
-| PostgreSQL | localhost:5438 | Database |
+| API (HTTPS) | https://localhost:7300 | REST + MCP + Swagger |
+| API (HTTP) | http://localhost:7301 | HTTP access |
+| PostgreSQL | localhost:7438 | Database |
 | Angular | https://localhost:4200 | Dev server (ng serve) |
 | Andy Auth | https://localhost:5001 | OAuth 2.0 / OIDC |
 | Andy RBAC | https://localhost:5003 | RBAC permission server |
+
+Native `dotnet run` defaults to https://localhost:5300 / http://localhost:5301 (per `launchSettings.json`).
 
 ## Conductor Embedded Mode
 
 | Property | Value |
 |----------|-------|
-| Port | 9107 |
+| Port | 9111 |
 | Proxy prefix | `/settings` |
 | Database | SQLite |
-| Access | `http://localhost:9100/settings/*` via UnifiedProxy |
+| Access | `http://localhost:9100/settings/*` via Conductor's UnifiedProxy |

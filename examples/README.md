@@ -4,7 +4,7 @@ Code samples showing how to consume the Andy Settings REST API from various lang
 
 ## Prerequisites
 
-- A running Andy Settings API (default: `https://localhost:5300`)
+- A running Andy Settings API (default: `https://localhost:5300` for native `dotnet run`, `https://localhost:7300` under docker compose)
 - A JWT Bearer token (set `ANDY_SETTINGS_TOKEN` env var)
 
 ## Quick Start
