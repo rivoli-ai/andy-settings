@@ -70,7 +70,17 @@ var dataProtectionKeysDir = Environment.GetEnvironmentVariable("ANDY_DATAPROTECT
         ".andy", "dataprotection-keys");
 Directory.CreateDirectory(dataProtectionKeysDir);
 builder.Services.AddDataProtection()
-    .PersistKeysToFileSystem(new DirectoryInfo(dataProtectionKeysDir));
+    .PersistKeysToFileSystem(new DirectoryInfo(dataProtectionKeysDir))
+    // Pin the application discriminator (rivoli-ai/conductor#2118). Without
+    // this, DataProtection derives the discriminator from the CONTENT ROOT
+    // PATH — so a payload encrypted while the service ran from one services
+    // dir (app bundle, conductord worktree snapshot, canonical repo dir)
+    // throws "The payload was invalid" after ANY relocation, even with the
+    // identical key ring on disk. That made every hosting-mode or deploy-path
+    // change silently invalidate ALL stored secrets, forcing users to
+    // re-enter keys/PATs over and over. A fixed name makes payload
+    // portability follow the key ring, not the install path.
+    .SetApplicationName("andy-settings");
 
 // ── Application services ────────────────────────────────────────────────────
 builder.Services.AddHttpContextAccessor();
