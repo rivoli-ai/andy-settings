@@ -1,0 +1,270 @@
+{
+  "$schema": "../../andy-service-template/docs/registration.schema.json",
+  "service": {
+    "name": "andy-models",
+    "displayName": "Andy Models",
+    "description": "Model catalog and routing — registry of inference backends (OpenAI, Anthropic, Google, local) with per-Mtok pricing, grouping, and routing policies.",
+    "embeddedProxyPrefix": "/models",
+    "ports": {
+      "dotnetHttps": 5120,
+      "dotnetHttp": 5121,
+      "dotnetPostgres": 5441,
+      "dotnetClient": 4207,
+      "dockerHttps": 7120,
+      "dockerHttp": 7121,
+      "dockerPostgres": 7441,
+      "dockerClient": 6207,
+      "embeddedProxy": 9100
+    }
+  },
+  "auth": {
+    "audience": "urn:andy-models-api",
+    "apiClient": {
+      "clientId": "andy-models-api",
+      "clientType": "confidential",
+      "clientSecretEnvVar": "ANDY_MODELS_API_SECRET",
+      "displayName": "Andy Models API",
+      "description": "Service-to-service client for Andy Models",
+      "grantTypes": ["authorization_code", "refresh_token", "client_credentials"],
+      "scopes": ["email", "profile", "roles", "scp:urn:andy-models-api", "scp:urn:andy-rbac-api"]
+    },
+    "webClient": {
+      "clientId": "andy-models-web",
+      "clientType": "public",
+      "displayName": "Andy Models Web",
+      "description": "Angular SPA for browsing the model catalog, managing providers, and reviewing routing rules",
+      "grantTypes": ["authorization_code", "refresh_token"],
+      "scopes": ["email", "profile", "roles", "scp:urn:andy-models-api"],
+      "redirectUris": [
+        "https://localhost:4207/callback",
+        "https://localhost:6207/callback",
+        "http://localhost:9100/models/callback"
+      ],
+      "postLogoutRedirectUris": [
+        "https://localhost:4207/",
+        "https://localhost:6207/",
+        "http://localhost:9100/models/"
+      ]
+    },
+    "productionUris": {
+      "redirectUris": [],
+      "postLogoutRedirectUris": []
+    }
+  },
+  "rbac": {
+    "applicationCode": "andy-models",
+    "applicationName": "Andy Models",
+    "description": "Model catalog, provider registry, and routing policies.",
+    "resourceTypes": [
+      { "code": "model",        "name": "Model",         "supportsInstances": true  },
+      { "code": "provider",     "name": "Provider",      "supportsInstances": true  },
+      { "code": "routing-rule", "name": "Routing Rule",  "supportsInstances": true  },
+      { "code": "pricing-tier", "name": "Pricing Tier",  "supportsInstances": true  },
+      { "code": "settings",     "name": "Settings",      "supportsInstances": false }
+    ],
+    "roles": [
+      { "code": "admin",    "name": "Administrator", "description": "Full CRUD on models, providers, routing rules, and pricing tiers.",                          "isSystem": true },
+      { "code": "curator",  "name": "Catalog Curator","description": "May add or edit models and providers; cannot approve price changes or routing rules.",     "isSystem": true },
+      { "code": "reviewer", "name": "Reviewer",       "description": "Approves price-tier changes, routing-rule activations, and provider-credential rotations.","isSystem": true },
+      { "code": "viewer",   "name": "Viewer",         "description": "Read-only access to the catalog, providers, and routing metadata (no pricing secrets).",   "isSystem": true }
+    ],
+    "testUserRole": "admin"
+  },
+  "settings": {
+    "definitions": [
+      {
+        "key": "andy.models.defaults.openai.apiKey",
+        "displayName": "OpenAI API Key",
+        "description": "API key for OpenAI-family providers (GPT, embeddings).",
+        "category": "Providers",
+        "dataType": "Secret",
+        "isSecret": true,
+        "allowedScopes": ["Machine", "Application", "User"]
+      },
+      {
+        "key": "andy.models.defaults.openai.organization",
+        "displayName": "OpenAI Organization ID",
+        "description": "Optional org ID for OpenAI requests (team/project scoping).",
+        "category": "Providers",
+        "dataType": "String",
+        "allowedScopes": ["Machine", "Application"]
+      },
+      {
+        "key": "andy.models.defaults.anthropic.apiKey",
+        "displayName": "Anthropic API Key",
+        "description": "API key for Anthropic (Claude family).",
+        "category": "Providers",
+        "dataType": "Secret",
+        "isSecret": true,
+        "allowedScopes": ["Machine", "Application", "User"]
+      },
+      {
+        "key": "andy.models.defaults.google.apiKey",
+        "displayName": "Google Generative AI API Key",
+        "description": "API key for Google (Gemini family).",
+        "category": "Providers",
+        "dataType": "Secret",
+        "isSecret": true,
+        "allowedScopes": ["Machine", "Application", "User"]
+      },
+      {
+        "key": "andy.models.providers.openai.apiKey",
+        "displayName": "OpenAI Provider API Key",
+        "description": "API key for the 'openai' provider row. Canonical per-provider key: written by Conductor (Machine scope), resolved by the andy-models proxy.",
+        "category": "Providers",
+        "dataType": "Secret",
+        "isSecret": true,
+        "allowedScopes": ["Machine", "Application", "User"]
+      },
+      {
+        "key": "andy.models.providers.anthropic.apiKey",
+        "displayName": "Anthropic Provider API Key",
+        "description": "API key for the 'anthropic' provider row. Canonical per-provider key: written by Conductor (Machine scope), resolved by the andy-models proxy.",
+        "category": "Providers",
+        "dataType": "Secret",
+        "isSecret": true,
+        "allowedScopes": ["Machine", "Application", "User"]
+      },
+      {
+        "key": "andy.models.providers.google.apiKey",
+        "displayName": "Google Gemini Provider API Key",
+        "description": "API key for the 'google' provider row. Canonical per-provider key: written by Conductor (Machine scope), resolved by the andy-models proxy.",
+        "category": "Providers",
+        "dataType": "Secret",
+        "isSecret": true,
+        "allowedScopes": ["Machine", "Application", "User"]
+      },
+      {
+        "key": "andy.models.providers.azure-openai.apiKey",
+        "displayName": "Azure OpenAI Provider API Key",
+        "description": "API key for the 'azure-openai' provider row. Canonical per-provider key: written by Conductor (Machine scope), resolved by the andy-models proxy.",
+        "category": "Providers",
+        "dataType": "Secret",
+        "isSecret": true,
+        "allowedScopes": ["Machine", "Application", "User"]
+      },
+      {
+        "key": "andy.models.providers.cerebras.apiKey",
+        "displayName": "Cerebras Provider API Key",
+        "description": "API key for the 'cerebras' provider row. Canonical per-provider key: written by Conductor (Machine scope), resolved by the andy-models proxy.",
+        "category": "Providers",
+        "dataType": "Secret",
+        "isSecret": true,
+        "allowedScopes": ["Machine", "Application", "User"]
+      },
+      {
+        "key": "andy.models.providers.groq.apiKey",
+        "displayName": "Groq Provider API Key",
+        "description": "API key for the 'groq' provider row. Canonical per-provider key: written by Conductor (Machine scope), resolved by the andy-models proxy.",
+        "category": "Providers",
+        "dataType": "Secret",
+        "isSecret": true,
+        "allowedScopes": ["Machine", "Application", "User"]
+      },
+      {
+        "key": "andy.models.providers.mistral.apiKey",
+        "displayName": "Mistral AI Provider API Key",
+        "description": "API key for the 'mistral' provider row. Canonical per-provider key: written by Conductor (Machine scope), resolved by the andy-models proxy.",
+        "category": "Providers",
+        "dataType": "Secret",
+        "isSecret": true,
+        "allowedScopes": ["Machine", "Application", "User"]
+      },
+      {
+        "key": "andy.models.providers.ollama.apiKey",
+        "displayName": "Ollama (local) Provider API Key",
+        "description": "API key for the 'ollama' provider row. Canonical per-provider key: written by Conductor (Machine scope), resolved by the andy-models proxy.",
+        "category": "Providers",
+        "dataType": "Secret",
+        "isSecret": true,
+        "allowedScopes": ["Machine", "Application", "User"]
+      },
+      {
+        "key": "andy.models.providers.openai-compatible.apiKey",
+        "displayName": "OpenAI-compatible Provider API Key",
+        "description": "API key for the 'openai-compatible' provider row. Canonical per-provider key: written by Conductor (Machine scope), resolved by the andy-models proxy.",
+        "category": "Providers",
+        "dataType": "Secret",
+        "isSecret": true,
+        "allowedScopes": ["Machine", "Application", "User"]
+      },
+      {
+        "key": "andy.models.providers.openai-compatible-generic.apiKey",
+        "displayName": "OpenAI-compatible (generic) Provider API Key",
+        "description": "API key for the 'openai-compatible-generic' provider row. Canonical per-provider key: written by Conductor (Machine scope), resolved by the andy-models proxy.",
+        "category": "Providers",
+        "dataType": "Secret",
+        "isSecret": true,
+        "allowedScopes": ["Machine", "Application", "User"]
+      },
+      {
+        "key": "andy.models.providers.openrouter.apiKey",
+        "displayName": "OpenRouter Provider API Key",
+        "description": "API key for the 'openrouter' provider row. Canonical per-provider key: written by Conductor (Machine scope), resolved by the andy-models proxy.",
+        "category": "Providers",
+        "dataType": "Secret",
+        "isSecret": true,
+        "allowedScopes": ["Machine", "Application", "User"]
+      },
+      {
+        "key": "andy.models.providers.aws-bedrock.apiKey",
+        "displayName": "AWS Bedrock Provider API Key",
+        "description": "API key for the 'aws-bedrock' provider row. Canonical per-provider key: written by Conductor (Machine scope), resolved by the andy-models proxy.",
+        "category": "Providers",
+        "dataType": "Secret",
+        "isSecret": true,
+        "allowedScopes": ["Machine", "Application", "User"]
+      },
+      {
+        "key": "andy.models.providers.vllm.apiKey",
+        "displayName": "vLLM (self-hosted) Provider API Key",
+        "description": "API key for the 'vllm' provider row. Canonical per-provider key: written by Conductor (Machine scope), resolved by the andy-models proxy.",
+        "category": "Providers",
+        "dataType": "Secret",
+        "isSecret": true,
+        "allowedScopes": ["Machine", "Application", "User"]
+      },
+      {
+        "key": "andy.models.routing.fallbackProvider",
+        "displayName": "Fallback Provider",
+        "description": "Provider used when the preferred route is unavailable. Leave empty to fail fast.",
+        "category": "Routing",
+        "dataType": "String",
+        "defaultValue": "anthropic",
+        "allowedScopes": ["Machine", "Application", "Team", "User"]
+      },
+      {
+        "key": "andy.models.routing.maxRetries",
+        "displayName": "Max Retries",
+        "description": "Maximum retries on transient upstream failures before falling through to the fallback provider.",
+        "category": "Routing",
+        "dataType": "Integer",
+        "defaultValue": 2
+      },
+      {
+        "key": "andy.models.routing.requestTimeoutSeconds",
+        "displayName": "Request Timeout",
+        "description": "Hard timeout for any single upstream inference request, in seconds.",
+        "category": "Routing",
+        "dataType": "Integer",
+        "defaultValue": 120
+      },
+      {
+        "key": "andy.models.pricing.currency",
+        "displayName": "Pricing Currency",
+        "description": "ISO 4217 currency code used for per-Mtok pricing display and cost reporting.",
+        "category": "Pricing",
+        "dataType": "String",
+        "defaultValue": "USD"
+      },
+      {
+        "key": "andy.models.cache.ttlSeconds",
+        "displayName": "Model Catalog Cache TTL",
+        "description": "Cache TTL (seconds) for provider catalog responses. Higher means fewer provider calls but staler metadata.",
+        "category": "Performance",
+        "dataType": "Integer",
+        "defaultValue": 600
+      }
+    ]
+  }
+}
