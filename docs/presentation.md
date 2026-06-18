@@ -293,14 +293,16 @@ Tradeoff: simplicity & resilience (stateless reads) vs. freshness.
 
 | Port | Purpose |
 |------|---------|
-| 5300 | API HTTPS |
-| 5301 | API HTTP |
-| 5438 | PostgreSQL |
+| 5300 | API HTTPS (native `dotnet run`) |
+| 5301 | API HTTP (native `dotnet run`) |
+| 7300 | API HTTPS (docker compose) |
+| 7301 | API HTTP (docker compose) |
+| 7438 | PostgreSQL (docker compose) |
 | 4200 | Angular dev |
-| 9107 | Conductor embedded (settings) |
+| 9111 | Conductor embedded (settings) |
 
 ```json
-"ConnectionStrings": { "DefaultConnection": "Host=localhost;Port=5438;Database=andy_settings;…" },
+"ConnectionStrings": { "DefaultConnection": "Host=localhost;Port=7438;Database=andy_settings;…" },
 "Database": { "Provider": "PostgreSql" },
 "AndyAuth": { "Authority": "https://localhost:5001", "Audience": "urn:andy-settings-api" },
 "Rbac": { "ApiBaseUrl": "https://localhost:5003", "ApplicationCode": "settings" }

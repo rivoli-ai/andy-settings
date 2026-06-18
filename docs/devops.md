@@ -62,10 +62,10 @@ Key features:
 
 ## Docker Compose Services
 
-| Service | Image | Port | Description |
-|---------|-------|------|-------------|
-| `postgres` | postgres:16-alpine | 5438 | Database |
-| `api` | (built from Dockerfile) | 5300 (HTTPS), 5301 (HTTP) | API + SPA |
+| Service | Image | Host Port | Container Port | Description |
+|---------|-------|-----------|----------------|-------------|
+| `postgres` | postgres:16-alpine | 7438 | 5432 | Database |
+| `api` | (built from Dockerfile) | 7300 (HTTPS), 7301 (HTTP) | 8443, 8080 | API + SPA |
 
 Environment variables for the API container:
 
@@ -85,7 +85,7 @@ Rbac__ApplicationCode: settings
 When running inside Conductor, no Docker is needed:
 
 - Conductor's `ServiceOrchestrator` launches the .NET process
-- Port 9107, prefix `/settings`
+- Port 9111, prefix `/settings`
 - SQLite at `~/Library/Application Support/ai.rivoli.conductor/db/andy-settings.sqlite`
 - `Database__Provider=Sqlite` environment variable
 
@@ -144,11 +144,13 @@ Suggested GitHub Actions stages:
 
 | Service | Port |
 |---------|------|
-| API HTTPS | 5300 |
-| API HTTP | 5301 |
-| PostgreSQL | 5438 |
+| API HTTPS (native `dotnet run`) | 5300 |
+| API HTTP (native `dotnet run`) | 5301 |
+| API HTTPS (docker compose) | 7300 |
+| API HTTP (docker compose) | 7301 |
+| PostgreSQL (docker compose) | 7438 |
 | Angular dev server | 4200 |
 | Conductor proxy | 9100 |
-| Conductor settings service | 9107 |
+| Conductor settings service | 9111 |
 | Andy Auth | 5001 |
 | Andy RBAC | 5003 |

@@ -1,6 +1,6 @@
 # Conductor Integration Guide
 
-Andy Settings runs as the 8th embedded .NET service inside the Conductor macOS app.
+Andy Settings runs as an embedded .NET service inside the Conductor macOS app.
 
 ## Service Configuration
 
@@ -12,7 +12,7 @@ Add to `Conductor/Core/ServiceHost/Services/`:
 struct SettingsServiceConfig: EmbeddedServiceConfig {
     let name = "andy-settings"
     let executableName = "Andy.Settings.Api"
-    let port = 9107
+    let port = 9111
     let proxyPrefix = "/settings"
     let healthPath = "/health"
     let dependsOn: [String] = ["andy-auth", "andy-rbac"]
@@ -48,7 +48,7 @@ try await launch(settingsConfig)
 Add route to `UnifiedProxy.routeTable`:
 
 ```swift
-"/settings": 9107
+"/settings": 9111
 ```
 
 ## Swift Client Integration
@@ -164,7 +164,12 @@ Auto-migrated on first startup. Seeded with 25 definitions for all Andy services
 | andy-auth | 9101 | /auth |
 | andy-rbac | 9102 | /rbac |
 | andy-containers | 9103 | /containers |
-| andy-devpilot | 9104 | /devpilot |
 | andy-docs | 9105 | /docs |
-| andy-mcp-gateway | 9106 | /mcp |
-| **andy-settings** | **9107** | **/settings** |
+| andy-code-index | 9107 | /code-index |
+| andy-issues | 9108 | /issues |
+| andy-agents | 9109 | /agents |
+| andy-tasks | 9110 | /tasks |
+| **andy-settings** | **9111** | **/settings** |
+| andy-models | 9112 | /models |
+| andy-policies | 9113 | /policies |
+| andy-mcp-proxy | 9114 | /mcp-proxy |

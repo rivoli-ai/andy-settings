@@ -163,7 +163,7 @@ Seed definitions for all Andy services:
 - `andy.rbac.*` -- API base URL, application codes
 - `andy.containers.*` -- default provider, resource limits
 - `andy.codeindex.*` -- embedding provider, model
-- `andy.devpilot.*` -- LLM provider, agent settings
+- `andy.issues.*` -- issue-refinement LLM provider, agent settings
 - `andy.docs.*` -- source paths, rendering options
 - `andy.settings.*` -- meta-configuration
 

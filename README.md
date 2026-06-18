@@ -34,7 +34,7 @@ andy-settings/
 - **Typed Definitions** -- strongly typed setting schemas with validation and UI metadata
 - **Scoped Resolution** -- 8-level scope precedence with deterministic resolution and explanation
 - **Encrypted Secrets** -- AES-256-GCM via Data Protection API, RBAC-gated access
-- **Conductor Integration** -- embedded as 8th service in Conductor macOS app (port 9107, SQLite)
+- **Conductor Integration** -- embedded as a service in the Conductor macOS app (port 9111, SQLite)
 - **Auth & RBAC** -- Andy Auth (OIDC) + Andy RBAC with scope-aware permissions
 - **REST + Swagger + MCP** -- full API with OpenAPI docs and Model Context Protocol tools
 - **CLI** -- command-line tool with OAuth device flow, table/JSON output
@@ -46,23 +46,26 @@ andy-settings/
 ```bash
 # Docker Compose (PostgreSQL mode)
 docker compose up --build
-# API: https://localhost:5300 | Swagger: https://localhost:5300/swagger
+# API: https://localhost:7300 | Swagger: https://localhost:7300/swagger
 
 # Native development (SQLite mode)
 dotnet run --project src/Andy.Settings.Api
 cd client && npm install && npm start
+# Native API: https://localhost:5300 | Swagger: https://localhost:5300/swagger
 ```
 
 ## Default Ports
 
 | Service | Port |
 |---------|------|
-| API HTTPS | 5300 |
-| API HTTP | 5301 |
-| PostgreSQL | 5438 |
+| API HTTPS (native dev) | 5300 |
+| API HTTP (native dev) | 5301 |
+| API HTTPS (docker) | 7300 |
+| API HTTP (docker) | 7301 |
+| PostgreSQL (docker) | 7438 |
 | Angular dev | 4200 |
 | Conductor proxy | 9100 |
-| Conductor settings | 9107 |
+| Conductor settings | 9111 |
 | Andy Auth | 5001 |
 | Andy RBAC | 5003 |
 
@@ -71,7 +74,7 @@ cd client && npm install && npm start
 andy-settings follows the command / event split codified in [ADR 0001 — Messaging](https://github.com/rivoli-ai/andy-tasks/blob/main/docs/adr/0001-messaging.md):
 
 - **Commands stay on HTTP.** Every imperative — set a value, create a definition, fetch a resolved setting — is a synchronous REST call against the API.
-- **Events go on NATS.** Each successful write enqueues a `config.*.changed` event on the JetStream `ANDY_DOMAIN` stream. Consumers (e.g. `mcp-gateway`) subscribe to the slice that names them; andy-settings never subscribes to itself.
+- **Events go on NATS.** Each successful write enqueues a `config.*.changed` event on the JetStream `ANDY_DOMAIN` stream. Consumers (e.g. `andy-mcp-proxy`) subscribe to the slice that names them; andy-settings never subscribes to itself.
 
 The full event catalog and consumer onboarding guide is in [docs/messaging.md](docs/messaging.md).
 

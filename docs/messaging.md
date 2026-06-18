@@ -19,13 +19,13 @@ andy.settings.events.config.<application_code>.<kind>
 | Token | Meaning | Example |
 |---|---|---|
 | `andy.settings.events.config` | Fixed prefix for this service's domain events. Publisher-exclusive. | — |
-| `<application_code>` | The owning application of the changed `SettingDefinition`. Dots are sanitized to dashes for the wire (the payload carries the original value). | `mcp-gateway`, `andy-containers`, `andy-tasks` |
+| `<application_code>` | The owning application of the changed `SettingDefinition`. Dots are sanitized to dashes for the wire (the payload carries the original value). | `mcp-proxy`, `andy-containers`, `andy-tasks` |
 | `<kind>` | Past-tense verb describing the change. | `created`, `updated`, `deleted` |
 
 Consumers should subscribe via NATS wildcards rather than enumerating
 subjects:
 
-- All config changes for a single app: `andy.settings.events.config.mcp-gateway.>`
+- All config changes for a single app: `andy.settings.events.config.mcp-proxy.>`
 - All updates across every app: `andy.settings.events.config.*.updated`
 - Everything: `andy.settings.events.config.>`
 
@@ -45,10 +45,10 @@ service.
 {
   "schema_version": 1,
   "assignment_id": "8f49a4c0-...",
-  "key": "andy.mcp-gateway.fronted_services",
-  "application_code": "mcp-gateway",
+  "key": "andy.mcp-proxy.fronted_services",
+  "application_code": "mcp-proxy",
   "scope_type": "Application",
-  "scope_id": "mcp-gateway",
+  "scope_id": "mcp-proxy",
   "kind": "updated",
   "new_value_digest": "9a3c…",       // sha256 of new ValueJson; null on delete
   "etag": "5e0c…",
@@ -106,7 +106,7 @@ operational pause is the right tool.
 ## Consumer onboarding
 
 1. **Pick a durable name.** Format: `<your-service>.<purpose>` —
-   e.g. `mcp-gateway.config-watcher`. JetStream keys offsets by this
+   e.g. `mcp-proxy.config-watcher`. JetStream keys offsets by this
    name, so it must be stable across restarts.
 2. **Dedupe on `msg-id`.** Use a DB-backed `seen_messages` table per
    AK3. In-memory ring buffers are insufficient: they don't survive
