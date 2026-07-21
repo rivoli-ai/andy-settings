@@ -98,6 +98,11 @@ namespace Andy.Settings.Infrastructure.Migrations
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)");
 
+                    b.Property<string>("ScopeKey")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
                     b.Property<string>("ScopeType")
                         .IsRequired()
                         .HasMaxLength(32)
@@ -112,7 +117,7 @@ namespace Andy.Settings.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("DefinitionId", "ScopeType", "ScopeId")
+                    b.HasIndex("DefinitionId", "ScopeType", "ScopeKey")
                         .IsUnique();
 
                     b.ToTable("EncryptedSecrets");
@@ -216,6 +221,11 @@ namespace Andy.Settings.Infrastructure.Migrations
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)");
 
+                    b.Property<string>("ScopeKey")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
                     b.Property<string>("ScopeType")
                         .IsRequired()
                         .HasMaxLength(32)
@@ -239,7 +249,8 @@ namespace Andy.Settings.Infrastructure.Migrations
 
                     b.HasIndex("ScopeType");
 
-                    b.HasIndex("DefinitionId", "ScopeType", "ScopeId");
+                    b.HasIndex("DefinitionId", "ScopeType", "ScopeKey")
+                        .IsUnique();
 
                     b.ToTable("SettingAssignments");
                 });
@@ -311,7 +322,7 @@ namespace Andy.Settings.Infrastructure.Migrations
 
                     b.HasIndex("Category");
 
-                    b.HasIndex("Key", "ApplicationCode")
+                    b.HasIndex("Key")
                         .IsUnique();
 
                     b.ToTable("SettingDefinitions");

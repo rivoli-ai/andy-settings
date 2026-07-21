@@ -37,7 +37,7 @@ public class OutboxEmissionTests : IClassFixture<CustomWebApplicationFactory>
         // under Fixtures/registrations/*.
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SettingsDbContext>();
-        var definition = await db.SettingDefinitions.FirstAsync();
+        var definition = await db.SettingDefinitions.SingleAsync(d => d.Key == "andy.containers.defaultProvider");
 
         var client = _factory.CreateClient();
         var resp = await client.PostAsJsonAsync("/api/values", new
@@ -73,7 +73,7 @@ public class OutboxEmissionTests : IClassFixture<CustomWebApplicationFactory>
     {
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SettingsDbContext>();
-        var definition = await db.SettingDefinitions.FirstAsync();
+        var definition = await db.SettingDefinitions.SingleAsync(d => d.Key == "andy.containers.defaultProvider");
 
         var client = _factory.CreateClient();
         var first = await client.PostAsJsonAsync("/api/values", new
@@ -117,7 +117,7 @@ public class OutboxEmissionTests : IClassFixture<CustomWebApplicationFactory>
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SettingsDbContext>();
         var bus = (InMemoryMessageBus)scope.ServiceProvider.GetRequiredService<IMessageBus>();
-        var definition = await db.SettingDefinitions.FirstAsync();
+        var definition = await db.SettingDefinitions.SingleAsync(d => d.Key == "andy.containers.defaultProvider");
 
         const string filter = "andy.settings.events.config.>";
         bus.EnsureChannel(filter);
@@ -126,7 +126,7 @@ public class OutboxEmissionTests : IClassFixture<CustomWebApplicationFactory>
         var resp = await client.PostAsJsonAsync("/api/values", new
         {
             definitionKey = definition.Key,
-            scopeType = ScopeType.Workspace,
+            scopeType = ScopeType.User,
             scopeId = "ws-dispatch-test",
             valueJson = "\"dispatched\"",
         });

@@ -1,5 +1,6 @@
 using Andy.Settings.Application.DTOs.Effective;
 using Andy.Settings.Application.Interfaces;
+using Andy.Rbac.Authorization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -15,6 +16,7 @@ public class EffectiveController : ControllerBase
     public EffectiveController(IResolutionService service) => _service = service;
 
     [HttpPost("resolve")]
+    [RequirePermission("value:read")]
     [ProducesResponseType(typeof(ResolvedSetting), StatusCodes.Status200OK)]
     public async Task<IActionResult> Resolve([FromBody] ResolveRequest request, CancellationToken ct)
     {
@@ -23,6 +25,7 @@ public class EffectiveController : ControllerBase
     }
 
     [HttpPost("resolve-batch")]
+    [RequirePermission("value:read")]
     [ProducesResponseType(typeof(IReadOnlyList<ResolvedSetting>), StatusCodes.Status200OK)]
     public async Task<IActionResult> ResolveBatch([FromBody] ResolveBatchRequest request, CancellationToken ct)
     {
@@ -31,6 +34,7 @@ public class EffectiveController : ControllerBase
     }
 
     [HttpPost("explain")]
+    [RequirePermission("value:read")]
     [ProducesResponseType(typeof(ResolvedSetting), StatusCodes.Status200OK)]
     public async Task<IActionResult> Explain([FromBody] ResolveRequest request, CancellationToken ct)
     {

@@ -70,7 +70,17 @@ var dataProtectionKeysDir = Environment.GetEnvironmentVariable("ANDY_DATAPROTECT
         ".andy", "dataprotection-keys");
 Directory.CreateDirectory(dataProtectionKeysDir);
 builder.Services.AddDataProtection()
-    .PersistKeysToFileSystem(new DirectoryInfo(dataProtectionKeysDir));
+    .PersistKeysToFileSystem(new DirectoryInfo(dataProtectionKeysDir))
+    // Pin the application discriminator (rivoli-ai/conductor#2118). Without
+    // this, DataProtection derives the discriminator from the CONTENT ROOT
+    // PATH — so a payload encrypted while the service ran from one services
+    // dir (app bundle, conductord worktree snapshot, canonical repo dir)
+    // throws "The payload was invalid" after ANY relocation, even with the
+    // identical key ring on disk. That made every hosting-mode or deploy-path
+    // change silently invalidate ALL stored secrets, forcing users to
+    // re-enter keys/PATs over and over. A fixed name makes payload
+    // portability follow the key ring, not the install path.
+    .SetApplicationName("andy-settings");
 
 // ── Application services ────────────────────────────────────────────────────
 builder.Services.AddHttpContextAccessor();
@@ -87,6 +97,7 @@ builder.Services.AddScoped<DataSeeder>();
 // ── MCP Server ─────────────────────────────────────────────────────────────
 builder.Services.AddMcpServer()
     .WithHttpTransport()
+    .AddAuthorizationFilters()
     .WithToolsFromAssembly();
 
 // ── Authentication (Andy Auth) ──────────────────────────────────────────────
@@ -155,11 +166,22 @@ if (!string.IsNullOrEmpty(rbacBaseUrl))
             }));
     }
 
-    builder.Services.AddRbacClient(options =>
+    if (builder.Environment.IsDevelopment())
     {
-        options.ApiBaseUrl = rbacBaseUrl;
-        options.ApplicationCode = "settings";
-    });
+        // Development policies are explicitly permissive below; keep the
+        // client registration independent of M2M secrets for local/test hosts.
+        builder.Services.AddRbacClient(options =>
+        {
+            options.ApiBaseUrl = rbacBaseUrl;
+            options.ApplicationCode = "settings";
+        });
+    }
+    else
+    {
+        // RBAC's API is protected too. Use the client-credentials handler so a
+        // valid end-user token is not accidentally forwarded as service identity.
+        builder.Services.AddRbacClientWithM2M(builder.Configuration);
+    }
 
     if (builder.Environment.IsDevelopment())
     {
@@ -283,7 +305,9 @@ app.UseAuthorization();
 
 app.MapControllers();
 
-app.MapMcp("/mcp").RequireCors("AllowMcpClients");
+app.MapMcp("/mcp")
+    .RequireAuthorization()
+    .RequireCors("AllowMcpClients");
 
 // ── MCP OAuth well-known endpoints ──────────────────────────────────────────
 if (!string.IsNullOrEmpty(andyAuthAuthority))

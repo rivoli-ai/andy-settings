@@ -6,7 +6,7 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
   standalone: true,
   imports: [RouterLink, RouterLinkActive],
   template: `
-    <nav class="w-[280px] min-h-screen bg-white border-r border-surface-200 flex flex-col">
+    <nav class="sidebar-nav w-[280px] min-h-screen bg-white border-r border-surface-200 flex flex-col">
       <div class="flex items-center h-16 px-5 border-b border-surface-200">
         <span class="text-xl font-semibold text-primary-500 tracking-tight">Andy Settings</span>
       </div>

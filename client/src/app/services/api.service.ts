@@ -53,6 +53,19 @@ export class ApiService {
     return this.http.delete(`${this.baseUrl}/values/${id}`);
   }
 
+  // Secrets are deliberately isolated from ordinary value endpoints.
+  setSecret(definitionKey: string, body: { scopeType: string; scopeId: string | null; value: string }): Observable<any> {
+    return this.http.post(`${this.baseUrl}/secrets/${encodeURIComponent(definitionKey)}`, body);
+  }
+
+  rotateSecret(definitionKey: string, body: { scopeType: string; scopeId: string | null; newValue: string }): Observable<any> {
+    return this.http.post(`${this.baseUrl}/secrets/${encodeURIComponent(definitionKey)}/rotate`, body);
+  }
+
+  deleteSecret(definitionKey: string): Observable<any> {
+    return this.http.delete(`${this.baseUrl}/secrets/${encodeURIComponent(definitionKey)}`);
+  }
+
   // Effective resolution
   resolve(key: string, context: any): Observable<any> {
     return this.http.post(`${this.baseUrl}/effective/resolve`, { key, context });

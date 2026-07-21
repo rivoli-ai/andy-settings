@@ -127,7 +127,7 @@ export class EffectiveExplorerComponent {
     const ctx = this.buildContext();
     this.api.resolve(this.key, ctx).subscribe({
       next: (data: any) => this.result = data,
-      error: (err: any) => this.errorMsg = err.error?.message || 'Failed to resolve.'
+      error: (err: any) => this.errorMsg = err.error?.error || err.error?.message || 'Failed to resolve.'
     });
   }
 
@@ -137,7 +137,7 @@ export class EffectiveExplorerComponent {
     const ctx = this.buildContext();
     this.api.explain(this.key, ctx).subscribe({
       next: (data: any) => this.result = data,
-      error: (err: any) => this.errorMsg = err.error?.message || 'Failed to explain.'
+      error: (err: any) => this.errorMsg = err.error?.error || err.error?.message || 'Failed to explain.'
     });
   }
 

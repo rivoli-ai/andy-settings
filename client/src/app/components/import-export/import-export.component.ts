@@ -123,10 +123,12 @@ export class ImportExportComponent {
     this.api.exportSettings(this.exportAppCode || undefined).subscribe({
       next: (data: any) => {
         this.exportResult = data;
-        this.exportJson = JSON.stringify(data.data || data, null, 2);
+        this.exportJson = typeof data.data === 'string'
+          ? JSON.stringify(JSON.parse(data.data), null, 2)
+          : JSON.stringify(data.data || data, null, 2);
       },
       error: (err: any) => {
-        this.exportError = err.error?.message || 'Export failed.';
+        this.exportError = err.error?.error || err.error?.message || 'Export failed.';
       }
     });
   }
@@ -151,7 +153,7 @@ export class ImportExportComponent {
           this.previewJson = JSON.stringify(data, null, 2);
         },
         error: (err: any) => {
-          this.importError = err.error?.message || 'Preview failed.';
+          this.importError = err.error?.error || err.error?.message || 'Preview failed.';
         }
       });
     } catch {
@@ -171,7 +173,7 @@ export class ImportExportComponent {
           this.previewJson = '';
         },
         error: (err: any) => {
-          this.importError = err.error?.message || 'Import failed.';
+          this.importError = err.error?.error || err.error?.message || 'Import failed.';
         }
       });
     } catch {

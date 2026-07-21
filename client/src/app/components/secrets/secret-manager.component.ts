@@ -18,7 +18,7 @@ import { ApiService } from '../../services/api.service';
               <th class="px-4 py-3 text-left text-xs font-medium text-surface-500 uppercase tracking-wider">Key</th>
               <th class="px-4 py-3 text-left text-xs font-medium text-surface-500 uppercase tracking-wider">App</th>
               <th class="px-4 py-3 text-left text-xs font-medium text-surface-500 uppercase tracking-wider">Category</th>
-              <th class="px-4 py-3 text-left text-xs font-medium text-surface-500 uppercase tracking-wider">Has Value</th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-surface-500 uppercase tracking-wider">Storage</th>
               <th class="px-4 py-3 text-left text-xs font-medium text-surface-500 uppercase tracking-wider">Actions</th>
             </tr>
           </thead>
@@ -30,9 +30,7 @@ import { ApiService } from '../../services/api.service';
               <td class="px-4 py-3 text-sm">{{ s.applicationCode }}</td>
               <td class="px-4 py-3 text-sm">{{ s.category }}</td>
               <td class="px-4 py-3 text-sm">
-                <span [class]="s.hasValue ? 'badge badge-success' : 'badge badge-danger'">
-                  {{ s.hasValue ? 'Set' : 'Not set' }}
-                </span>
+                <span class="badge badge-success">Encrypted</span>
               </td>
               <td class="px-4 py-3 text-sm">
                 <div class="flex gap-2">
@@ -53,7 +51,7 @@ import { ApiService } from '../../services/api.service';
       <div class="card" *ngIf="selectedKey">
         <div class="card-body">
           <h2 class="text-lg font-semibold text-surface-900 mb-4">
-            Set Secret: <span class="text-primary-500 font-mono">{{ selectedKey }}</span>
+            {{ rotationMode ? 'Rotate' : 'Set' }} Secret: <span class="text-primary-500 font-mono">{{ selectedKey }}</span>
           </h2>
           <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
             <div>
@@ -89,11 +87,12 @@ export class SecretManagerComponent implements OnInit {
   selectedKey = '';
   successMsg = '';
   errorMsg = '';
+  rotationMode = false;
 
   scopeTypes = ['Machine', 'Application', 'Service', 'User', 'Team', 'Workspace'];
 
   form = {
-    scopeType: '',
+    scopeType: 'Machine',
     scopeId: '',
     value: ''
   };
@@ -109,19 +108,7 @@ export class SecretManagerComponent implements OnInit {
     this.api.getDefinitions({ pageSize: 500 }).subscribe((data: any) => {
       const secretDefs = (data.items || []).filter((d: any) => d.isSecret);
 
-      // For each secret, check if a value exists
-      this.secrets = secretDefs.map((d: any) => ({
-        ...d,
-        hasValue: false
-      }));
-
-      // Check assignments for each secret key
-      this.secrets.forEach((s, idx) => {
-        this.api.getValues({ definitionKey: s.key }).subscribe((valData: any) => {
-          const items = valData.items || valData || [];
-          this.secrets[idx].hasValue = items.length > 0;
-        });
-      });
+      this.secrets = secretDefs;
 
       this.loading = false;
     });
@@ -129,7 +116,8 @@ export class SecretManagerComponent implements OnInit {
 
   openSetForm(secret: any) {
     this.selectedKey = secret.key;
-    this.form = { scopeType: '', scopeId: '', value: '' };
+    this.rotationMode = false;
+    this.form = { scopeType: 'Machine', scopeId: '', value: '' };
     this.clearMessages();
   }
 
@@ -141,26 +129,32 @@ export class SecretManagerComponent implements OnInit {
   saveSecret() {
     this.clearMessages();
     const dto = {
-      definitionKey: this.selectedKey,
-      scopeType: this.form.scopeType || null,
+      scopeType: this.form.scopeType || 'Machine',
       scopeId: this.form.scopeId || null,
       value: this.form.value
     };
-    this.api.setValue(dto).subscribe({
+    const request = this.rotationMode
+      ? this.api.rotateSecret(this.selectedKey, {
+          scopeType: dto.scopeType,
+          scopeId: dto.scopeId,
+          newValue: dto.value
+        })
+      : this.api.setSecret(this.selectedKey, dto);
+    request.subscribe({
       next: () => {
         this.successMsg = 'Secret saved successfully.';
-        this.form = { scopeType: '', scopeId: '', value: '' };
+        this.form = { scopeType: 'Machine', scopeId: '', value: '' };
         this.loadSecrets();
       },
       error: (err: any) => {
-        this.errorMsg = err.error?.message || 'Failed to save secret.';
+        this.errorMsg = err.error?.error || err.error?.message || 'Failed to save secret.';
       }
     });
   }
 
   rotateSecret(secret: any) {
-    // Placeholder: rotation would involve a dedicated API endpoint
-    alert(`Secret rotation for "${secret.key}" is not yet implemented on the server.`);
+    this.openSetForm(secret);
+    this.rotationMode = true;
   }
 
   private clearMessages() {

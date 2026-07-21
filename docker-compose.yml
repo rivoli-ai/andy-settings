@@ -35,6 +35,7 @@ services:
       # For production, set to: https://host.docker.internal:5001
       - AndyAuth__Authority=
       - AndyAuth__Audience=urn:andy-settings-api
+      - ANDY_DATAPROTECTION_KEYS_DIR=/app/.aspnet/DataProtection-Keys
       - AndyAuth__RequireHttpsMetadata=false
       - Rbac__ApiBaseUrl=https://host.docker.internal:5003
       - Rbac__ApplicationCode=settings

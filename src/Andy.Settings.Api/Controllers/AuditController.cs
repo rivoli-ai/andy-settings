@@ -1,6 +1,7 @@
 using Andy.Settings.Application.DTOs.Audit;
 using Andy.Settings.Application.DTOs.Common;
 using Andy.Settings.Application.Interfaces;
+using Andy.Rbac.Authorization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -16,6 +17,7 @@ public class AuditController : ControllerBase
     public AuditController(IAuditService service) => _service = service;
 
     [HttpGet]
+    [RequirePermission("audit:read")]
     [ProducesResponseType(typeof(PagedResult<AuditEventDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> Query([FromQuery] AuditQuery query, CancellationToken ct)
     {
@@ -24,6 +26,7 @@ public class AuditController : ControllerBase
     }
 
     [HttpGet("{id:guid}")]
+    [RequirePermission("audit:read")]
     [ProducesResponseType(typeof(AuditEventDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetById(Guid id, CancellationToken ct)

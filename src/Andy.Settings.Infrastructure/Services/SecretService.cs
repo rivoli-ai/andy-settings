@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using System.Security.Cryptography;
+using System.Text.Json;
 
 namespace Andy.Settings.Infrastructure.Services;
 
@@ -33,8 +34,10 @@ public class SecretService : ISecretService
         var definition = await _db.SettingDefinitions.FirstOrDefaultAsync(d => d.Key == dto.DefinitionKey, ct)
             ?? throw new KeyNotFoundException($"Definition '{dto.DefinitionKey}' not found.");
 
-        if (!definition.IsSecret)
+        if (!definition.IsSecret && definition.DataType != SettingDataType.Secret)
             throw new InvalidOperationException($"Definition '{dto.DefinitionKey}' is not a secret-type setting.");
+
+        ValidateScope(definition, dto.ScopeType, dto.ScopeId);
 
         var encrypted = _protector.Protect(dto.PlaintextValue);
 
@@ -42,7 +45,7 @@ public class SecretService : ISecretService
             .FirstOrDefaultAsync(s =>
                 s.DefinitionId == definition.Id &&
                 s.ScopeType == dto.ScopeType &&
-                s.ScopeId == dto.ScopeId, ct);
+                s.ScopeKey == (dto.ScopeId ?? string.Empty), ct);
 
         // rivoli-ai/conductor#925 (M1.2.1). A first-time write is
         // `Set`; an overwrite is `Rotated`. Both carry the same
@@ -106,7 +109,7 @@ public class SecretService : ISecretService
             .FirstOrDefaultAsync(s =>
                 s.DefinitionId == definition.Id &&
                 s.ScopeType == dto.ScopeType &&
-                s.ScopeId == dto.ScopeId, ct);
+                s.ScopeKey == (dto.ScopeId ?? string.Empty), ct);
 
         if (secret is null)
             return null;
@@ -181,4 +184,27 @@ public class SecretService : ISecretService
     private static SecretMetadataDto ToMetadataDto(EncryptedSecret e, string definitionKey) => new(
         e.Id, e.DefinitionId, definitionKey, e.ScopeType, e.ScopeId,
         e.UpdatedBy, e.CreatedAt, e.UpdatedAt);
+
+    private static void ValidateScope(SettingDefinition definition, ScopeType scopeType, string? scopeId)
+    {
+        if (scopeType == ScopeType.Machine && !string.IsNullOrEmpty(scopeId))
+            throw new InvalidOperationException("Machine-scoped secrets must not specify a scopeId.");
+        if (scopeType != ScopeType.Machine && string.IsNullOrWhiteSpace(scopeId))
+            throw new InvalidOperationException($"{scopeType}-scoped secrets require a scopeId.");
+        if (string.IsNullOrWhiteSpace(definition.AllowedScopesJson))
+            return;
+
+        try
+        {
+            var allowed = JsonSerializer.Deserialize<string[]>(definition.AllowedScopesJson) ?? [];
+            if (!allowed.Any(value => Enum.TryParse<ScopeType>(value, true, out var parsed) && parsed == scopeType))
+                throw new InvalidOperationException(
+                    $"Scope '{scopeType}' is not allowed for definition '{definition.Key}'.");
+        }
+        catch (JsonException ex)
+        {
+            throw new InvalidOperationException(
+                $"Definition '{definition.Key}' has invalid allowed-scopes metadata.", ex);
+        }
+    }
 }

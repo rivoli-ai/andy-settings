@@ -1,8 +1,7 @@
 using Andy.Settings.Api;
 using Microsoft.Extensions.Hosting;
-using Xunit;
 
-namespace Andy.Settings.Api.Tests;
+namespace Andy.Settings.Tests.Unit.Api;
 
 public class HostEnvironmentExtensionsTests
 {

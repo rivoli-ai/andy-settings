@@ -84,7 +84,7 @@ public class DataSeeder
                     Category = def.Category,
                     DataType = dataType,
                     DefaultValueJson = SerializeDefaultValue(def.DefaultValue),
-                    IsSecret = def.IsSecret ?? false,
+                    IsSecret = (def.IsSecret ?? false) || dataType == SettingDataType.Secret,
                     AllowedScopesJson = SerializeAllowedScopes(def.AllowedScopes),
                     CreatedAt = now,
                     UpdatedAt = now
