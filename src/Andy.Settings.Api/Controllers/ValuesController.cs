@@ -2,6 +2,7 @@ using Andy.Settings.Application.DTOs.Common;
 using Andy.Settings.Application.DTOs.Values;
 using Andy.Settings.Application.Interfaces;
 using Andy.Settings.Domain.Enums;
+using Andy.Rbac.Authorization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -22,6 +23,7 @@ public class ValuesController : ControllerBase
     }
 
     [HttpGet]
+    [RequirePermission("value:read")]
     [ProducesResponseType(typeof(PagedResult<AssignmentDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> List(
         [FromQuery] string? definitionKey,
@@ -36,6 +38,7 @@ public class ValuesController : ControllerBase
     }
 
     [HttpPost]
+    [RequirePermission("value:write")]
     [ProducesResponseType(typeof(AssignmentDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
@@ -54,9 +57,14 @@ public class ValuesController : ControllerBase
         {
             return Conflict(new { error = ex.Message });
         }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
     }
 
     [HttpDelete("{id:guid}")]
+    [RequirePermission("value:delete")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
@@ -73,10 +81,18 @@ public class ValuesController : ControllerBase
     }
 
     [HttpPost("bulk")]
+    [RequirePermission("value:write")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     public async Task<IActionResult> BulkSet([FromBody] IEnumerable<SetValueDto> dtos, CancellationToken ct)
     {
-        await _service.BulkSetAsync(dtos, _currentUser.GetUserId(), ct);
-        return NoContent();
+        try
+        {
+            await _service.BulkSetAsync(dtos, _currentUser.GetUserId(), ct);
+            return NoContent();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
     }
 }

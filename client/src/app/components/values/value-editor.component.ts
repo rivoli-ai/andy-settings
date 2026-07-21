@@ -53,7 +53,7 @@ import { ApiService } from '../../services/api.service';
               <tr *ngFor="let a of assignments" class="hover:bg-surface-50">
                 <td class="px-4 py-3 text-sm"><span class="badge badge-info">{{ a.scopeType }}</span></td>
                 <td class="px-4 py-3 text-sm">{{ a.scopeId || '(global)' }}</td>
-                <td class="px-4 py-3 text-sm font-mono">{{ a.value }}</td>
+                <td class="px-4 py-3 text-sm font-mono">{{ a.valueJson }}</td>
                 <td class="px-4 py-3 text-sm">{{ a.version }}</td>
                 <td class="px-4 py-3 text-sm">
                   <button class="btn-danger btn-sm" (click)="deleteAssignment(a.id)">Delete</button>
@@ -155,7 +155,7 @@ export class ValueEditorComponent implements OnInit {
       definitionKey: this.selectedKey,
       scopeType: this.form.scopeType,
       scopeId: this.form.scopeId || null,
-      value: this.form.value
+      valueJson: this.toValueJson(this.form.value)
     };
     this.api.setValue(dto).subscribe({
       next: () => {
@@ -164,7 +164,7 @@ export class ValueEditorComponent implements OnInit {
         this.loadAssignments();
       },
       error: (err: any) => {
-        this.errorMsg = err.error?.message || 'Failed to save assignment.';
+        this.errorMsg = err.error?.error || err.error?.message || 'Failed to save assignment.';
       }
     });
   }
@@ -177,7 +177,7 @@ export class ValueEditorComponent implements OnInit {
         this.loadAssignments();
       },
       error: (err: any) => {
-        this.errorMsg = err.error?.message || 'Failed to delete assignment.';
+        this.errorMsg = err.error?.error || err.error?.message || 'Failed to delete assignment.';
       }
     });
   }
@@ -185,5 +185,14 @@ export class ValueEditorComponent implements OnInit {
   private clearMessages() {
     this.successMsg = '';
     this.errorMsg = '';
+  }
+
+  private toValueJson(value: string): string {
+    try {
+      JSON.parse(value);
+      return value;
+    } catch {
+      return JSON.stringify(value);
+    }
   }
 }

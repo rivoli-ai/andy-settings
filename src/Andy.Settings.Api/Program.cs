@@ -97,6 +97,7 @@ builder.Services.AddScoped<DataSeeder>();
 // ── MCP Server ─────────────────────────────────────────────────────────────
 builder.Services.AddMcpServer()
     .WithHttpTransport()
+    .AddAuthorizationFilters()
     .WithToolsFromAssembly();
 
 // ── Authentication (Andy Auth) ──────────────────────────────────────────────
@@ -165,11 +166,22 @@ if (!string.IsNullOrEmpty(rbacBaseUrl))
             }));
     }
 
-    builder.Services.AddRbacClient(options =>
+    if (builder.Environment.IsDevelopment())
     {
-        options.ApiBaseUrl = rbacBaseUrl;
-        options.ApplicationCode = "settings";
-    });
+        // Development policies are explicitly permissive below; keep the
+        // client registration independent of M2M secrets for local/test hosts.
+        builder.Services.AddRbacClient(options =>
+        {
+            options.ApiBaseUrl = rbacBaseUrl;
+            options.ApplicationCode = "settings";
+        });
+    }
+    else
+    {
+        // RBAC's API is protected too. Use the client-credentials handler so a
+        // valid end-user token is not accidentally forwarded as service identity.
+        builder.Services.AddRbacClientWithM2M(builder.Configuration);
+    }
 
     if (builder.Environment.IsDevelopment())
     {
@@ -293,7 +305,9 @@ app.UseAuthorization();
 
 app.MapControllers();
 
-app.MapMcp("/mcp").RequireCors("AllowMcpClients");
+app.MapMcp("/mcp")
+    .RequireAuthorization()
+    .RequireCors("AllowMcpClients");
 
 // ── MCP OAuth well-known endpoints ──────────────────────────────────────────
 if (!string.IsNullOrEmpty(andyAuthAuthority))

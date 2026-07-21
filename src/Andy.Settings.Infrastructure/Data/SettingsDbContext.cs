@@ -55,7 +55,9 @@ public class SettingsDbContext : DbContext
         modelBuilder.Entity<SettingDefinition>(entity =>
         {
             entity.HasKey(e => e.Id);
-            entity.HasIndex(e => new { e.Key, e.ApplicationCode }).IsUnique();
+            // Every public lookup addresses a definition by key alone. Enforce the
+            // same identity rule in the database so those lookups are deterministic.
+            entity.HasIndex(e => e.Key).IsUnique();
             entity.HasIndex(e => e.ApplicationCode);
             entity.HasIndex(e => e.Category);
 
@@ -81,13 +83,14 @@ public class SettingsDbContext : DbContext
         modelBuilder.Entity<SettingAssignment>(entity =>
         {
             entity.HasKey(e => e.Id);
-            entity.HasIndex(e => new { e.DefinitionId, e.ScopeType, e.ScopeId });
+            entity.HasIndex(e => new { e.DefinitionId, e.ScopeType, e.ScopeKey }).IsUnique();
             entity.HasIndex(e => e.ScopeType);
 
             entity.Property(e => e.ValueJson).IsRequired();
             entity.Property(e => e.Etag).IsRequired().HasMaxLength(64);
             entity.Property(e => e.ScopeType).HasConversion<string>().HasMaxLength(32);
             entity.Property(e => e.ScopeId).HasMaxLength(256);
+            entity.Property(e => e.ScopeKey).IsRequired().HasMaxLength(256);
             entity.Property(e => e.UpdatedBy).HasMaxLength(256);
         });
 
@@ -95,11 +98,12 @@ public class SettingsDbContext : DbContext
         modelBuilder.Entity<EncryptedSecret>(entity =>
         {
             entity.HasKey(e => e.Id);
-            entity.HasIndex(e => new { e.DefinitionId, e.ScopeType, e.ScopeId }).IsUnique();
+            entity.HasIndex(e => new { e.DefinitionId, e.ScopeType, e.ScopeKey }).IsUnique();
 
             entity.Property(e => e.EncryptedValue).IsRequired();
             entity.Property(e => e.ScopeType).HasConversion<string>().HasMaxLength(32);
             entity.Property(e => e.ScopeId).HasMaxLength(256);
+            entity.Property(e => e.ScopeKey).IsRequired().HasMaxLength(256);
             entity.Property(e => e.UpdatedBy).HasMaxLength(256);
         });
 

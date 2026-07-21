@@ -1,6 +1,7 @@
 using Andy.Settings.Application.DTOs.Secrets;
 using Andy.Settings.Application.Interfaces;
 using Andy.Settings.Domain.Enums;
+using Andy.Rbac.Authorization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -21,6 +22,7 @@ public class SecretsController : ControllerBase
     }
 
     [HttpPost("{definitionKey}")]
+    [RequirePermission("secret:write")]
     [ProducesResponseType(typeof(SecretMetadataDto), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -52,6 +54,7 @@ public class SecretsController : ControllerBase
     }
 
     [HttpGet("{definitionKey}")]
+    [RequirePermission("secret:read")]
     [ProducesResponseType(typeof(SecretValueResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetSecret(
@@ -80,6 +83,7 @@ public class SecretsController : ControllerBase
     }
 
     [HttpPost("{definitionKey}/rotate")]
+    [RequirePermission("secret:write")]
     [ProducesResponseType(typeof(SecretMetadataDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> RotateSecret(
@@ -103,9 +107,14 @@ public class SecretsController : ControllerBase
         {
             return NotFound();
         }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
     }
 
     [HttpDelete("{definitionKey}")]
+    [RequirePermission("secret:write")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> DeleteSecret(string definitionKey, CancellationToken ct)

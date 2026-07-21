@@ -1,6 +1,6 @@
 export const environment = {
   production: true,
   apiUrl: '/api',
-  authAuthority: '',
+  authAuthority: globalThis.location.origin + '/auth',
   authClientId: 'andy-settings-web',
 };

@@ -8,6 +8,7 @@ using Andy.Settings.Application.DTOs.Secrets;
 using Andy.Settings.Application.DTOs.Values;
 using Andy.Settings.Application.Interfaces;
 using Andy.Settings.Domain.Enums;
+using Andy.Rbac.Authorization;
 using ModelContextProtocol.Server;
 
 namespace Andy.Settings.Api.Mcp;
@@ -47,6 +48,7 @@ public class SettingsMcpTools
     }
 
     [McpServerTool(Name = "settings_list_definitions")]
+    [RequirePermission("definition:read")]
     [Description("List setting definitions, optionally filtered by application code or category")]
     public async Task<string> ListDefinitions(
         string? applicationCode = null,
@@ -66,6 +68,7 @@ public class SettingsMcpTools
     }
 
     [McpServerTool(Name = "settings_get_effective")]
+    [RequirePermission("value:read")]
     [Description("Resolve the effective value of a setting for a given context")]
     public async Task<string> GetEffective(
         string key,
@@ -86,6 +89,7 @@ public class SettingsMcpTools
     }
 
     [McpServerTool(Name = "settings_set_value")]
+    [RequirePermission("value:write")]
     [Description("Set a setting value at a specific scope")]
     public async Task<string> SetValue(
         string definitionKey,
@@ -108,6 +112,7 @@ public class SettingsMcpTools
     }
 
     [McpServerTool(Name = "settings_delete_value")]
+    [RequirePermission("value:delete")]
     [Description("Delete a scoped setting value")]
     public async Task<string> DeleteValue(
         string definitionKey,
@@ -128,6 +133,7 @@ public class SettingsMcpTools
     }
 
     [McpServerTool(Name = "settings_explain")]
+    [RequirePermission("value:read")]
     [Description("Explain why a setting has its current effective value, showing the full scope resolution chain")]
     public async Task<string> Explain(
         string key,
@@ -146,6 +152,7 @@ public class SettingsMcpTools
     }
 
     [McpServerTool(Name = "settings_search")]
+    [RequirePermission("definition:read")]
     [Description("Search setting definitions by keyword")]
     public async Task<string> Search(
         string query,
@@ -161,6 +168,7 @@ public class SettingsMcpTools
     }
 
     [McpServerTool(Name = "settings_audit")]
+    [RequirePermission("audit:read")]
     [Description("Get recent audit events for setting changes")]
     public async Task<string> Audit(
         string? definitionKey = null,
@@ -176,6 +184,7 @@ public class SettingsMcpTools
     }
 
     [McpServerTool(Name = "settings_categories")]
+    [RequirePermission("definition:read")]
     [Description("List all distinct categories across setting definitions")]
     public async Task<string> Categories()
     {
@@ -192,6 +201,7 @@ public class SettingsMcpTools
     }
 
     [McpServerTool(Name = "settings_export")]
+    [RequirePermission("export:read")]
     [Description("Export settings as JSON")]
     public async Task<string> Export(
         string? applicationCode = null)
@@ -206,6 +216,7 @@ public class SettingsMcpTools
     }
 
     [McpServerTool(Name = "settings_get_definition")]
+    [RequirePermission("definition:read")]
     [Description("Get a single setting definition by its key")]
     public async Task<string> GetDefinition(string key)
     {
@@ -224,6 +235,7 @@ public class SettingsMcpTools
     }
 
     [McpServerTool(Name = "settings_create_definition")]
+    [RequirePermission("definition:write")]
     [Description("Create a new setting definition")]
     public async Task<string> CreateDefinition(
         string key,
@@ -261,6 +273,7 @@ public class SettingsMcpTools
     }
 
     [McpServerTool(Name = "settings_update_definition")]
+    [RequirePermission("definition:write")]
     [Description("Update an existing setting definition by key")]
     public async Task<string> UpdateDefinition(
         string key,
@@ -288,6 +301,7 @@ public class SettingsMcpTools
     }
 
     [McpServerTool(Name = "settings_delete_definition")]
+    [RequirePermission("definition:delete")]
     [Description("Delete a setting definition by key")]
     public async Task<string> DeleteDefinition(string key)
     {
@@ -303,6 +317,7 @@ public class SettingsMcpTools
     }
 
     [McpServerTool(Name = "settings_list_values")]
+    [RequirePermission("value:read")]
     [Description("List setting value assignments, optionally filtered by definition key and scope")]
     public async Task<string> ListValues(
         string? definitionKey = null,
@@ -331,6 +346,7 @@ public class SettingsMcpTools
     }
 
     [McpServerTool(Name = "settings_set_secret")]
+    [RequirePermission("secret:write")]
     [Description("Set an encrypted secret value for a setting definition at a specific scope")]
     public async Task<string> SetSecret(
         string definitionKey,
@@ -360,6 +376,7 @@ public class SettingsMcpTools
     }
 
     [McpServerTool(Name = "settings_get_secret")]
+    [RequirePermission("secret:read")]
     [Description("Get a decrypted secret value for a setting definition (requires permission)")]
     public async Task<string> GetSecret(
         string definitionKey,
@@ -394,6 +411,7 @@ public class SettingsMcpTools
     }
 
     [McpServerTool(Name = "settings_rotate_secret")]
+    [RequirePermission("secret:write")]
     [Description("Rotate an encrypted secret value for a setting definition")]
     public async Task<string> RotateSecret(
         string definitionKey,
@@ -423,6 +441,7 @@ public class SettingsMcpTools
     }
 
     [McpServerTool(Name = "settings_delete_secret")]
+    [RequirePermission("secret:write")]
     [Description("Delete a secret by its definition key")]
     public async Task<string> DeleteSecret(string definitionKey)
     {
@@ -438,6 +457,7 @@ public class SettingsMcpTools
     }
 
     [McpServerTool(Name = "settings_resolve_batch")]
+    [RequirePermission("value:read")]
     [Description("Resolve multiple setting keys at once, returning effective values for the given context")]
     public async Task<string> ResolveBatch(
         string keys,
@@ -464,6 +484,7 @@ public class SettingsMcpTools
     }
 
     [McpServerTool(Name = "settings_import")]
+    [RequirePermission("import:write")]
     [Description("Import settings from JSON data")]
     public async Task<string> Import(string jsonData)
     {
@@ -481,6 +502,7 @@ public class SettingsMcpTools
     }
 
     [McpServerTool(Name = "settings_import_preview")]
+    [RequirePermission("import:write")]
     [Description("Preview what an import would change without applying it")]
     public async Task<string> ImportPreview(string jsonData)
     {

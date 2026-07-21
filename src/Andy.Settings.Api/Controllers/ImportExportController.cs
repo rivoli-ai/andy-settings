@@ -1,5 +1,6 @@
 using Andy.Settings.Application.DTOs.ImportExport;
 using Andy.Settings.Application.Interfaces;
+using Andy.Rbac.Authorization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -20,6 +21,7 @@ public class ImportExportController : ControllerBase
     }
 
     [HttpGet("export")]
+    [RequirePermission("export:read")]
     [ProducesResponseType(typeof(ExportResult), StatusCodes.Status200OK)]
     public async Task<IActionResult> Export([FromQuery] ExportOptions options, CancellationToken ct)
     {
@@ -28,18 +30,27 @@ public class ImportExportController : ControllerBase
     }
 
     [HttpPost("import")]
+    [RequirePermission("import:write")]
     [ProducesResponseType(typeof(ImportResult), StatusCodes.Status200OK)]
     public async Task<IActionResult> Import(CancellationToken ct)
     {
-        var result = await _service.ImportAsync(
-            Request.Body,
-            new ImportOptions { DryRun = false },
-            _currentUser.GetUserId(),
-            ct);
-        return Ok(result);
+        try
+        {
+            var result = await _service.ImportAsync(
+                Request.Body,
+                new ImportOptions { DryRun = false },
+                _currentUser.GetUserId(),
+                ct);
+            return Ok(result);
+        }
+        catch (InvalidDataException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
     }
 
     [HttpPost("import/preview")]
+    [RequirePermission("import:write")]
     [ProducesResponseType(typeof(ImportPreview), StatusCodes.Status200OK)]
     public async Task<IActionResult> PreviewImport(CancellationToken ct)
     {

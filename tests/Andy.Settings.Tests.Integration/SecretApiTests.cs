@@ -55,6 +55,25 @@ public class SecretApiTests : IClassFixture<CustomWebApplicationFactory>
     }
 
     [Fact]
+    public async Task OrdinaryValuesEndpoint_RejectsSecretPlaintext()
+    {
+        var key = $"test.secret.boundary.{Guid.NewGuid():N}";
+        await CreateSecretDefinitionAsync(key);
+
+        var response = await _client.PostAsJsonAsync("/api/values", new
+        {
+            definitionKey = key,
+            scopeType = "Machine",
+            valueJson = "\"must-not-be-stored\""
+        }, _jsonOptions);
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        var listed = await _client.GetFromJsonAsync<JsonElement>(
+            $"/api/values?definitionKey={Uri.EscapeDataString(key)}", _jsonOptions);
+        listed.GetProperty("totalCount").GetInt32().Should().Be(0);
+    }
+
+    [Fact]
     public async Task GetSecret_ReturnsValueThatMatchesOriginal()
     {
         var key = $"test.secret.get.{Guid.NewGuid():N}";

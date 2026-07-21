@@ -49,8 +49,9 @@ public class ResolutionService : IResolutionService
         var scopeCandidates = BuildScopeCandidates(context);
 
         // Query all matching assignments for this definition
+        var isSecret = definition.IsSecret || definition.DataType == SettingDataType.Secret;
         var assignments = await _db.SettingAssignments
-            .Where(a => a.DefinitionId == definition.Id)
+            .Where(a => a.DefinitionId == definition.Id && !isSecret)
             .ToListAsync(ct);
 
         // Build source chain and find winner
@@ -112,11 +113,11 @@ public class ResolutionService : IResolutionService
         return new ResolvedSetting
         {
             Key = key,
-            EffectiveValue = definition.IsSecret ? null : winningValue,
+            EffectiveValue = isSecret ? null : winningValue,
             WinningScopeType = winningScopeType,
             WinningScopeId = winningScopeId,
             DataType = definition.DataType,
-            IsSecret = definition.IsSecret,
+            IsSecret = isSecret,
             IsDefault = isDefault,
             SourceChain = includeSourceChain ? sourceChain : [],
             IsValid = true

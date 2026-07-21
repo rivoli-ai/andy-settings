@@ -40,7 +40,7 @@ internal sealed class AndySettingsHttpClient : IAndySettingsClient
         CancellationToken ct = default)
     {
         var resolved = await TryResolveAsync(key, context, ct);
-        return resolved ?? GetFallback(key);
+        return resolved is null ? GetFallback(key) : DecodeStringValue(resolved);
     }
 
     public async Task<int?> GetIntAsync(
@@ -66,7 +66,7 @@ internal sealed class AndySettingsHttpClient : IAndySettingsClient
         SettingsResolutionContext? context = null,
         CancellationToken ct = default)
     {
-        var raw = await GetStringAsync(key, context, ct);
+        var raw = await TryResolveAsync(key, context, ct) ?? GetFallback(key);
         if (string.IsNullOrEmpty(raw))
             return default;
 
@@ -96,7 +96,7 @@ internal sealed class AndySettingsHttpClient : IAndySettingsClient
             foreach (var key in keys)
             {
                 withFallback[key] = remote.TryGetValue(key, out var value) && value is not null
-                    ? value
+                    ? DecodeStringValue(value)
                     : GetFallback(key);
             }
             return withFallback;
@@ -223,6 +223,23 @@ internal sealed class AndySettingsHttpClient : IAndySettingsClient
     private string? GetFallback(string key)
     {
         return _options.CurrentValue.Defaults.TryGetValue(key, out var value) ? value : null;
+    }
+
+    private static string DecodeStringValue(string valueJson)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(valueJson);
+            return document.RootElement.ValueKind == JsonValueKind.String
+                ? document.RootElement.GetString() ?? string.Empty
+                : valueJson;
+        }
+        catch (JsonException)
+        {
+            // Preserve compatibility with servers or fallbacks that already
+            // return a raw string instead of the API's ValueJson contract.
+            return valueJson;
+        }
     }
 
     private void WarnOnce(string key, Exception ex)

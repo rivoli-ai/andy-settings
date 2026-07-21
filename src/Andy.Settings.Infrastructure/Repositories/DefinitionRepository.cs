@@ -2,6 +2,7 @@ using Andy.Settings.Application.DTOs.Common;
 using Andy.Settings.Application.DTOs.Definitions;
 using Andy.Settings.Application.Interfaces;
 using Andy.Settings.Domain.Entities;
+using Andy.Settings.Domain.Enums;
 using Andy.Settings.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 
@@ -64,10 +65,12 @@ public class DefinitionRepository : IDefinitionService
 
     public async Task<DefinitionDto> CreateAsync(CreateDefinitionDto dto, CancellationToken ct = default)
     {
-        var existing = await _db.SettingDefinitions
-            .AnyAsync(d => d.Key == dto.Key && d.ApplicationCode == dto.ApplicationCode, ct);
+        var existing = await _db.SettingDefinitions.AnyAsync(d => d.Key == dto.Key, ct);
         if (existing)
-            throw new InvalidOperationException($"Definition with key '{dto.Key}' already exists for application '{dto.ApplicationCode}'.");
+            throw new InvalidOperationException($"Definition with key '{dto.Key}' already exists.");
+
+        if ((dto.IsSecret || dto.DataType == SettingDataType.Secret) && dto.DefaultValueJson is not null)
+            throw new InvalidOperationException("Secret definitions cannot contain plaintext default values.");
 
         var entity = new SettingDefinition
         {
@@ -81,7 +84,7 @@ public class DefinitionRepository : IDefinitionService
             DefaultValueJson = dto.DefaultValueJson,
             ValidationJson = dto.ValidationJson,
             UiSchemaJson = dto.UiSchemaJson,
-            IsSecret = dto.IsSecret,
+            IsSecret = dto.IsSecret || dto.DataType == SettingDataType.Secret,
             AllowedScopesJson = dto.AllowedScopesJson,
             TagsJson = dto.TagsJson,
             CreatedAt = DateTimeOffset.UtcNow,
@@ -98,8 +101,11 @@ public class DefinitionRepository : IDefinitionService
     {
         var entity = await _db.SettingDefinitions
             .Include(d => d.Assignments)
+            .Include(d => d.Secrets)
             .FirstOrDefaultAsync(d => d.Key == key, ct)
             ?? throw new KeyNotFoundException($"Definition '{key}' not found.");
+
+        var wasSecret = entity.IsSecret || entity.DataType == SettingDataType.Secret;
 
         if (dto.DisplayName is not null) entity.DisplayName = dto.DisplayName;
         if (dto.Description is not null) entity.Description = dto.Description;
@@ -112,6 +118,14 @@ public class DefinitionRepository : IDefinitionService
         if (dto.AllowedScopesJson is not null) entity.AllowedScopesJson = dto.AllowedScopesJson;
         if (dto.TagsJson is not null) entity.TagsJson = dto.TagsJson;
         if (dto.IsDeprecated.HasValue) entity.IsDeprecated = dto.IsDeprecated.Value;
+        if (entity.DataType == SettingDataType.Secret)
+            entity.IsSecret = true;
+        var isSecret = entity.IsSecret || entity.DataType == SettingDataType.Secret;
+        if (wasSecret != isSecret && (entity.Assignments.Count > 0 || entity.Secrets.Count > 0))
+            throw new InvalidOperationException(
+                "A definition with stored values cannot be switched between secret and ordinary storage.");
+        if (isSecret && entity.DefaultValueJson is not null)
+            throw new InvalidOperationException("Secret definitions cannot contain plaintext default values.");
         entity.UpdatedAt = DateTimeOffset.UtcNow;
 
         await _db.SaveChangesAsync(ct);

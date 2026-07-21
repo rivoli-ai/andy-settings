@@ -7,6 +7,7 @@ using Andy.Settings.Domain.Enums;
 using Andy.Settings.Infrastructure.Data;
 using Andy.Settings.Infrastructure.Messaging;
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
 
 namespace Andy.Settings.Infrastructure.Repositories;
 
@@ -14,11 +15,13 @@ public class AssignmentRepository : IAssignmentService
 {
     private readonly SettingsDbContext _db;
     private readonly IAuditService _audit;
+    private readonly IValidationService _validation;
 
-    public AssignmentRepository(SettingsDbContext db, IAuditService audit)
+    public AssignmentRepository(SettingsDbContext db, IAuditService audit, IValidationService validation)
     {
         _db = db;
         _audit = audit;
+        _validation = validation;
     }
 
     public async Task<AssignmentDto> SetAsync(SetValueDto dto, string? actorId, CancellationToken ct = default)
@@ -26,11 +29,21 @@ public class AssignmentRepository : IAssignmentService
         var definition = await _db.SettingDefinitions.FirstOrDefaultAsync(d => d.Key == dto.DefinitionKey, ct)
             ?? throw new KeyNotFoundException($"Definition '{dto.DefinitionKey}' not found.");
 
+        if (definition.IsSecret || definition.DataType == SettingDataType.Secret)
+            throw new InvalidOperationException(
+                $"Definition '{dto.DefinitionKey}' is secret-backed and must be written through the secrets API.");
+
+        ValidateScope(definition, dto.ScopeType, dto.ScopeId);
+
+        var validationError = _validation.ValidateValue(definition, dto.ValueJson);
+        if (validationError is not null)
+            throw new InvalidOperationException(validationError);
+
         var existing = await _db.SettingAssignments
             .FirstOrDefaultAsync(a =>
                 a.DefinitionId == definition.Id &&
                 a.ScopeType == dto.ScopeType &&
-                a.ScopeId == dto.ScopeId, ct);
+                a.ScopeKey == (dto.ScopeId ?? string.Empty), ct);
 
         if (existing is not null)
         {
@@ -105,7 +118,10 @@ public class AssignmentRepository : IAssignmentService
         string? definitionKey, ScopeType? scopeType, string? scopeId,
         int page, int pageSize, CancellationToken ct = default)
     {
-        var q = _db.SettingAssignments.Include(a => a.Definition).AsQueryable();
+        // A historical or manually inserted plaintext assignment must never cross
+        // the ordinary values boundary once its definition is secret-backed.
+        var q = _db.SettingAssignments.Include(a => a.Definition)
+            .Where(a => !a.Definition.IsSecret && a.Definition.DataType != SettingDataType.Secret);
 
         if (!string.IsNullOrEmpty(definitionKey))
             q = q.Where(a => a.Definition.Key == definitionKey);
@@ -136,4 +152,28 @@ public class AssignmentRepository : IAssignmentService
     private static AssignmentDto ToDto(SettingAssignment e, string definitionKey) => new(
         e.Id, e.DefinitionId, definitionKey, e.ScopeType, e.ScopeId,
         e.ValueJson, e.Etag, e.Version, e.UpdatedBy, e.CreatedAt, e.UpdatedAt);
+
+    private static void ValidateScope(SettingDefinition definition, ScopeType scopeType, string? scopeId)
+    {
+        if (scopeType == ScopeType.Machine && !string.IsNullOrEmpty(scopeId))
+            throw new InvalidOperationException("Machine-scoped values must not specify a scopeId.");
+        if (scopeType != ScopeType.Machine && string.IsNullOrWhiteSpace(scopeId))
+            throw new InvalidOperationException($"{scopeType}-scoped values require a scopeId.");
+
+        if (string.IsNullOrWhiteSpace(definition.AllowedScopesJson))
+            return;
+
+        try
+        {
+            var allowed = JsonSerializer.Deserialize<string[]>(definition.AllowedScopesJson) ?? [];
+            if (!allowed.Any(value => Enum.TryParse<ScopeType>(value, true, out var parsed) && parsed == scopeType))
+                throw new InvalidOperationException(
+                    $"Scope '{scopeType}' is not allowed for definition '{definition.Key}'.");
+        }
+        catch (JsonException ex)
+        {
+            throw new InvalidOperationException(
+                $"Definition '{definition.Key}' has invalid allowed-scopes metadata.", ex);
+        }
+    }
 }

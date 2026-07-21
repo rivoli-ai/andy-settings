@@ -9,6 +9,7 @@ namespace Andy.Settings.Domain.Entities;
 /// </summary>
 public class EncryptedSecret
 {
+    private string? _scopeId;
     public Guid Id { get; set; }
 
     /// <summary>
@@ -24,7 +25,18 @@ public class EncryptedSecret
     /// <summary>
     /// Identifier of the scope target. Null for Machine scope.
     /// </summary>
-    public string? ScopeId { get; set; }
+    public string? ScopeId
+    {
+        get => _scopeId;
+        set
+        {
+            _scopeId = value;
+            ScopeKey = value ?? string.Empty;
+        }
+    }
+
+    /// <summary>Non-null database identity for a nullable scope identifier.</summary>
+    public string ScopeKey { get; private set; } = string.Empty;
 
     /// <summary>
     /// The encrypted value produced by <c>IDataProtector.Protect()</c>.
