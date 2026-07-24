@@ -31,10 +31,9 @@ public sealed class SqlSeenMessageStore
         TimeSpan ttl,
         CancellationToken ct = default)
     {
-        // Fast path: existence check before insert. The unique
-        // constraint on MsgId catches the race; the existence check
-        // saves a DB round-trip in the common "first delivery"
-        // scenario.
+        // Existence check first, unique constraint as the backstop: the
+        // check short-circuits the common re-delivery case, and the
+        // constraint closes the window between it and the insert.
         var exists = await _db.Set<SeenMessage>().AnyAsync(x => x.MsgId == msgId, ct);
         if (exists)
         {
@@ -60,6 +59,13 @@ public sealed class SqlSeenMessageStore
             // Race lost: another worker inserted the same MsgId between
             // our AnyAsync and SaveChangesAsync. The competing worker
             // is processing the message; we are not.
+            //
+            // Detach before returning. The failed row stays in the Added
+            // state otherwise, so the next SaveChangesAsync on this scoped
+            // context — the consumer's own unrelated write, in the same
+            // message scope — re-attempts the duplicate insert and throws
+            // again (rivoli-ai/andy-settings#137).
+            _db.Entry(row).State = EntityState.Detached;
             return false;
         }
     }

@@ -70,7 +70,7 @@ public class SecretsController : ControllerBase
                 DefinitionKey = definitionKey,
                 ScopeType = scopeType,
                 ScopeId = scopeId
-            }, ct);
+            }, _currentUser.GetUserId(), ct);
 
             return value is null
                 ? NotFound()
@@ -121,7 +121,7 @@ public class SecretsController : ControllerBase
     {
         try
         {
-            await _service.DeleteSecretAsync(definitionKey, ct);
+            await _service.DeleteSecretAsync(definitionKey, _currentUser.GetUserId(), ct);
             return NoContent();
         }
         catch (KeyNotFoundException)

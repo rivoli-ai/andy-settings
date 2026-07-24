@@ -230,4 +230,123 @@ public class SecretServiceTests : IDisposable
                 It.IsAny<CancellationToken>()),
             Times.Once);
     }
+
+    // rivoli-ai/andy-settings#132. Decrypting a secret is the most
+    // security-relevant operation this service performs and used to leave no
+    // trace at all.
+    [Fact]
+    public async Task GetSecretAsync_SuccessfulRead_RecordsAudit()
+    {
+        await SeedDefinition();
+        await _sut.SetSecretAsync(new SetSecretDto
+        {
+            DefinitionKey = "app.secret.key",
+            ScopeType = ScopeType.Machine,
+            PlaintextValue = "secret-value"
+        }, "writer");
+
+        var value = await _sut.GetSecretAsync(new GetSecretDto
+        {
+            DefinitionKey = "app.secret.key",
+            ScopeType = ScopeType.Machine
+        }, "reader");
+
+        value.Should().Be("secret-value");
+        _auditMock.Verify(
+            a => a.RecordAsync(
+                It.Is<AuditEventDto>(e =>
+                    e.EventType == AuditEventType.SecretRead &&
+                    e.DefinitionKey == "app.secret.key" &&
+                    e.ActorId == "reader"),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    // The audit trail records THAT a secret was read — never the value, and
+    // never a digest of it, which would let anyone with audit access confirm
+    // a guessed secret.
+    [Fact]
+    public async Task GetSecretAsync_AuditPayload_ContainsNoSecretMaterial()
+    {
+        await SeedDefinition();
+        await _sut.SetSecretAsync(new SetSecretDto
+        {
+            DefinitionKey = "app.secret.key",
+            ScopeType = ScopeType.Machine,
+            PlaintextValue = "super-secret-value"
+        }, "writer");
+
+        AuditEventDto? recorded = null;
+        _auditMock.Setup(a => a.RecordAsync(
+                It.Is<AuditEventDto>(e => e.EventType == AuditEventType.SecretRead),
+                It.IsAny<CancellationToken>()))
+            .Callback<AuditEventDto, CancellationToken>((e, _) => recorded = e)
+            .Returns(Task.CompletedTask);
+
+        await _sut.GetSecretAsync(new GetSecretDto
+        {
+            DefinitionKey = "app.secret.key",
+            ScopeType = ScopeType.Machine
+        }, "reader");
+
+        recorded.Should().NotBeNull();
+        recorded!.BeforeJson.Should().BeNull();
+        recorded.AfterJson.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task GetSecretAsync_MissingSecret_RecordsNoAudit()
+    {
+        await SeedDefinition();
+
+        var value = await _sut.GetSecretAsync(new GetSecretDto
+        {
+            DefinitionKey = "app.secret.key",
+            ScopeType = ScopeType.Machine
+        }, "reader");
+
+        value.Should().BeNull();
+        _auditMock.Verify(
+            a => a.RecordAsync(
+                It.Is<AuditEventDto>(e => e.EventType == AuditEventType.SecretRead),
+                It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task DeleteSecretAsync_RecordsAudit()
+    {
+        await SeedDefinition();
+        await _sut.SetSecretAsync(new SetSecretDto
+        {
+            DefinitionKey = "app.secret.key",
+            ScopeType = ScopeType.Machine,
+            PlaintextValue = "secret-value"
+        }, "writer");
+
+        await _sut.DeleteSecretAsync("app.secret.key", "deleter");
+
+        _auditMock.Verify(
+            a => a.RecordAsync(
+                It.Is<AuditEventDto>(e =>
+                    e.EventType == AuditEventType.SecretDeleted &&
+                    e.DefinitionKey == "app.secret.key" &&
+                    e.ActorId == "deleter"),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task DeleteSecretAsync_NothingToDelete_RecordsNoAudit()
+    {
+        await SeedDefinition();
+
+        await _sut.DeleteSecretAsync("app.secret.key", "deleter");
+
+        _auditMock.Verify(
+            a => a.RecordAsync(
+                It.Is<AuditEventDto>(e => e.EventType == AuditEventType.SecretDeleted),
+                It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
 }

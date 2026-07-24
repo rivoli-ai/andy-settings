@@ -22,17 +22,23 @@ public class SettingsMcpToolsTests
     private readonly Mock<IAuditService> _auditService = new();
     private readonly Mock<IExportImportService> _exportImportService = new();
     private readonly Mock<ISecretService> _secretService = new();
+    private readonly Mock<ICurrentUserService> _currentUser = new();
     private readonly SettingsMcpTools _sut;
+
+    private const string ActorId = "mcp-caller-sub";
 
     public SettingsMcpToolsTests()
     {
+        _currentUser.Setup(c => c.GetUserId()).Returns(ActorId);
+
         _sut = new SettingsMcpTools(
             _definitionService.Object,
             _resolutionService.Object,
             _assignmentService.Object,
             _auditService.Object,
             _exportImportService.Object,
-            _secretService.Object);
+            _secretService.Object,
+            _currentUser.Object);
     }
 
     [Fact]
@@ -366,7 +372,7 @@ public class SettingsMcpToolsTests
             .ReturnsAsync(assignments);
 
         _assignmentService
-            .Setup(s => s.DeleteAsync(assignmentId, null, It.IsAny<CancellationToken>()))
+            .Setup(s => s.DeleteAsync(assignmentId, ActorId, It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
         // Act
@@ -375,7 +381,7 @@ public class SettingsMcpToolsTests
         // Assert
         var doc = JsonDocument.Parse(json);
         doc.RootElement.GetProperty("success").GetBoolean().Should().BeTrue();
-        _assignmentService.Verify(s => s.DeleteAsync(assignmentId, null, It.IsAny<CancellationToken>()), Times.Once);
+        _assignmentService.Verify(s => s.DeleteAsync(assignmentId, ActorId, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -556,7 +562,7 @@ public class SettingsMcpToolsTests
             UpdatedAt: DateTimeOffset.UtcNow);
 
         _secretService
-            .Setup(s => s.SetSecretAsync(It.IsAny<SetSecretDto>(), null, It.IsAny<CancellationToken>()))
+            .Setup(s => s.SetSecretAsync(It.IsAny<SetSecretDto>(), ActorId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(metadata);
 
         // Act
@@ -572,7 +578,7 @@ public class SettingsMcpToolsTests
     {
         // Arrange
         _secretService
-            .Setup(s => s.GetSecretAsync(It.IsAny<GetSecretDto>(), It.IsAny<CancellationToken>()))
+            .Setup(s => s.GetSecretAsync(It.IsAny<GetSecretDto>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync("my-secret-value");
 
         // Act
@@ -626,7 +632,7 @@ public class SettingsMcpToolsTests
             UpdatedAt: DateTimeOffset.UtcNow);
 
         _secretService
-            .Setup(s => s.RotateSecretAsync(It.IsAny<RotateSecretDto>(), null, It.IsAny<CancellationToken>()))
+            .Setup(s => s.RotateSecretAsync(It.IsAny<RotateSecretDto>(), ActorId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(metadata);
 
         // Act
@@ -642,7 +648,7 @@ public class SettingsMcpToolsTests
     {
         // Arrange
         _secretService
-            .Setup(s => s.DeleteSecretAsync("app.api-key", It.IsAny<CancellationToken>()))
+            .Setup(s => s.DeleteSecretAsync("app.api-key", It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
         // Act
@@ -652,7 +658,7 @@ public class SettingsMcpToolsTests
         var doc = JsonDocument.Parse(json);
         doc.RootElement.GetProperty("success").GetBoolean().Should().BeTrue();
         doc.RootElement.GetProperty("message").GetString().Should().Contain("app.api-key");
-        _secretService.Verify(s => s.DeleteSecretAsync("app.api-key", It.IsAny<CancellationToken>()), Times.Once);
+        _secretService.Verify(s => s.DeleteSecretAsync("app.api-key", It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -711,7 +717,7 @@ public class SettingsMcpToolsTests
         };
 
         _exportImportService
-            .Setup(s => s.ImportAsync(It.IsAny<Stream>(), It.IsAny<ImportOptions>(), null, It.IsAny<CancellationToken>()))
+            .Setup(s => s.ImportAsync(It.IsAny<Stream>(), It.IsAny<ImportOptions>(), ActorId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(importResult);
 
         // Act
