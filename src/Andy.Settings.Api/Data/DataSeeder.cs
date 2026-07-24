@@ -19,34 +19,158 @@ public class DataSeeder
         _logger = logger;
     }
 
+    /// <summary>
+    /// Reconciles the definition catalog against every registration manifest
+    /// that loaded successfully this boot.
+    /// </summary>
+    /// <remarks>
+    /// This used to be insert-if-absent, which made manifests WRITE-ONCE: after
+    /// a key's first insertion, changing its default, validation, allowed
+    /// scopes or description in the owning service's registration.json had no
+    /// effect, ever (rivoli-ai/andy-settings#136). Since manifests are the
+    /// distribution mechanism for definitions, every definition in the
+    /// ecosystem was frozen at whatever shape it had on first boot.
+    ///
+    /// Ownership rule: the MANIFEST WINS. A definition whose ApplicationCode
+    /// matches a loaded manifest is owned by that manifest, and its schema is
+    /// reset to match on every boot — an operator's API edit to those fields is
+    /// overwritten. Operator-set VALUES (assignments and secrets) are never
+    /// touched here; only the schema is owned.
+    ///
+    /// Definitions that vanish from their manifest are marked deprecated rather
+    /// than deleted. Deletion cascades to stored assignments and encrypted
+    /// secrets, so a manifest typo would be unrecoverable.
+    ///
+    /// Reconciliation is scoped to application codes whose manifest actually
+    /// LOADED. RegistrationManifestLoader skips manifests that are missing or
+    /// fail to parse, and treating a failed load as "everything disappeared"
+    /// would deprecate a whole service's catalog on a transient file error.
+    /// </remarks>
     public async Task SeedAsync(CancellationToken ct = default)
     {
         var definitions = BuildSeedDefinitions();
-        definitions.AddRange(BuildFromManifests());
+        var (fromManifests, loadedApplicationCodes) = BuildFromManifests();
+        definitions.AddRange(fromManifests);
 
-        var existingKeys = await _db.SettingDefinitions
-            .Select(d => d.Key)
-            .ToListAsync(ct);
-        var toAdd = definitions
-            .Where(d => !existingKeys.Contains(d.Key))
-            // Deduplicate within this batch in case a manifest key collides with
-            // the legacy hardcoded catalog — manifest wins for future additions
-            // but we never insert the same Key twice.
-            .GroupBy(d => d.Key)
-            .Select(g => g.First())
+        // Manifest wins over the legacy hardcoded catalog on a key collision,
+        // and we never insert the same Key twice.
+        var desired = definitions
+            .GroupBy(d => d.Key, StringComparer.Ordinal)
+            .Select(g => g.Last())
             .ToList();
+        var desiredKeys = desired.Select(d => d.Key).ToHashSet(StringComparer.Ordinal);
 
-        if (toAdd.Count == 0)
+        var existing = await _db.SettingDefinitions
+            .Include(d => d.Assignments)
+            .Include(d => d.Secrets)
+            .ToListAsync(ct);
+        var existingByKey = existing.ToDictionary(d => d.Key, StringComparer.Ordinal);
+
+        var added = 0;
+        var updated = 0;
+        var deprecated = 0;
+        var revived = 0;
+
+        foreach (var incoming in desired)
         {
-            _logger.LogDebug("All setting definitions already seeded");
+            if (!existingByKey.TryGetValue(incoming.Key, out var current))
+            {
+                _db.SettingDefinitions.Add(incoming);
+                added++;
+                continue;
+            }
+
+            // Un-deprecate a key that came back into its manifest. Counted so
+            // the no-op guard below doesn't skip the save when reviving is the
+            // only change.
+            if (current.IsDeprecated)
+            {
+                current.IsDeprecated = false;
+                current.UpdatedAt = DateTimeOffset.UtcNow;
+                revived++;
+            }
+
+            if (TryReconcile(current, incoming))
+                updated++;
+        }
+
+        // Only for application codes whose manifest loaded this boot.
+        foreach (var orphan in existing.Where(d =>
+                     !d.IsDeprecated &&
+                     loadedApplicationCodes.Contains(d.ApplicationCode) &&
+                     !desiredKeys.Contains(d.Key)))
+        {
+            _logger.LogInformation(
+                "Definition {Key} is no longer declared by manifest {App}; marking deprecated. "
+                + "Stored values are retained.",
+                orphan.Key, orphan.ApplicationCode);
+            orphan.IsDeprecated = true;
+            orphan.UpdatedAt = DateTimeOffset.UtcNow;
+            deprecated++;
+        }
+
+        if (added == 0 && updated == 0 && deprecated == 0 && revived == 0)
+        {
+            _logger.LogDebug("Setting definitions already match their manifests");
             return;
         }
 
-        _logger.LogInformation("Seeding {Count} new setting definitions...", toAdd.Count);
-        _db.SettingDefinitions.AddRange(toAdd);
         await _db.SaveChangesAsync(ct);
 
-        _logger.LogInformation("Seeded {Count} new setting definitions", toAdd.Count);
+        _logger.LogInformation(
+            "Definition catalog reconciled: {Added} added, {Updated} updated, "
+            + "{Deprecated} deprecated, {Revived} un-deprecated",
+            added, updated, deprecated, revived);
+    }
+
+    /// <summary>
+    /// Copies manifest-owned schema onto an existing definition. Returns true
+    /// when anything actually changed.
+    /// </summary>
+    private bool TryReconcile(SettingDefinition current, SettingDefinition incoming)
+    {
+        // Switching storage mode with values already stored would strand or
+        // expose them. ExportImportService enforces the same rule on import.
+        var wasSecret = current.IsSecret || current.DataType == SettingDataType.Secret;
+        var willBeSecret = incoming.IsSecret || incoming.DataType == SettingDataType.Secret;
+        if (wasSecret != willBeSecret && (current.Assignments.Count > 0 || current.Secrets.Count > 0))
+        {
+            _logger.LogWarning(
+                "Manifest for {Key} switches secret storage mode but the definition has stored values; "
+                + "leaving it unchanged. Migrate the values, then re-run.",
+                current.Key);
+            return false;
+        }
+
+        var changed =
+            current.ApplicationCode != incoming.ApplicationCode ||
+            current.DisplayName != incoming.DisplayName ||
+            current.Description != incoming.Description ||
+            current.Category != incoming.Category ||
+            current.DataType != incoming.DataType ||
+            current.DefaultValueJson != incoming.DefaultValueJson ||
+            current.ValidationJson != incoming.ValidationJson ||
+            current.UiSchemaJson != incoming.UiSchemaJson ||
+            current.IsSecret != incoming.IsSecret ||
+            current.AllowedScopesJson != incoming.AllowedScopesJson ||
+            current.TagsJson != incoming.TagsJson;
+
+        if (!changed)
+            return false;
+
+        current.ApplicationCode = incoming.ApplicationCode;
+        current.DisplayName = incoming.DisplayName;
+        current.Description = incoming.Description;
+        current.Category = incoming.Category;
+        current.DataType = incoming.DataType;
+        current.DefaultValueJson = incoming.DefaultValueJson;
+        current.ValidationJson = incoming.ValidationJson;
+        current.UiSchemaJson = incoming.UiSchemaJson;
+        current.IsSecret = incoming.IsSecret;
+        current.AllowedScopesJson = incoming.AllowedScopesJson;
+        current.TagsJson = incoming.TagsJson;
+        current.UpdatedAt = DateTimeOffset.UtcNow;
+        return true;
     }
 
     /// <summary>
@@ -54,11 +178,18 @@ public class DataSeeder
     /// array into SettingDefinition rows. Manifest-provided defaults are JSON-encoded
     /// literally; secrets omit defaultValue.
     /// </summary>
-    private List<SettingDefinition> BuildFromManifests()
+    private (List<SettingDefinition> Rows, HashSet<string> LoadedApplicationCodes) BuildFromManifests()
     {
         var manifests = RegistrationManifestLoader.LoadAll(_configuration, _logger);
         var now = DateTimeOffset.UtcNow;
         var rows = new List<SettingDefinition>();
+
+        // Application codes whose manifest loaded successfully. Only these are
+        // eligible for the "disappeared from its manifest" sweep — a manifest
+        // that failed to load must never be read as an empty one.
+        var loadedApplicationCodes = manifests
+            .Select(m => m.Service.Name)
+            .ToHashSet(StringComparer.Ordinal);
 
         foreach (var manifest in manifests)
         {
@@ -92,7 +223,7 @@ public class DataSeeder
             }
         }
 
-        return rows;
+        return (rows, loadedApplicationCodes);
     }
 
     private static string? SerializeDefaultValue(object? value)
