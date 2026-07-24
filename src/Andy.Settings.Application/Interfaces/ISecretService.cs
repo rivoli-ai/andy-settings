@@ -1,4 +1,5 @@
 using Andy.Settings.Application.DTOs.Secrets;
+using Andy.Settings.Domain.Enums;
 
 namespace Andy.Settings.Application.Interfaces;
 
@@ -14,5 +15,15 @@ public interface ISecretService
     Task<string?> GetSecretAsync(GetSecretDto dto, string? actorId = null, CancellationToken ct = default);
 
     Task<SecretMetadataDto> RotateSecretAsync(RotateSecretDto dto, string? actorId, CancellationToken ct = default);
-    Task DeleteSecretAsync(string definitionKey, string? actorId = null, CancellationToken ct = default);
+    /// <summary>
+    /// Deletes stored secrets for a definition. Pass <paramref name="scopeType"/>
+    /// to delete one scope; leave it null to delete every scope for the key.
+    /// </summary>
+    /// <returns>How many secrets were deleted.</returns>
+    Task<int> DeleteSecretAsync(
+        string definitionKey,
+        ScopeType? scopeType = null,
+        string? scopeId = null,
+        string? actorId = null,
+        CancellationToken ct = default);
 }

@@ -135,7 +135,7 @@ POST   /api/effective/explain
 
 POST   /api/secrets/{definitionKey}
 POST   /api/secrets/{definitionKey}/rotate
-DELETE /api/secrets/{definitionKey}
+DELETE /api/secrets/{definitionKey}?scopeType=&scopeId=   (or ?allScopes=true)
 
 GET    /api/audit
 GET    /api/audit/{id}

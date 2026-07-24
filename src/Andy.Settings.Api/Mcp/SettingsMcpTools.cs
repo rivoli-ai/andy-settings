@@ -452,13 +452,41 @@ public class SettingsMcpTools
 
     [McpServerTool(Name = "settings_delete_secret")]
     [RequirePermission("secret:write")]
-    [Description("Delete a secret by its definition key")]
-    public async Task<string> DeleteSecret(string definitionKey)
+    [Description("Delete a secret at a specific scope, or every scope for the definition when allScopes is true")]
+    public async Task<string> DeleteSecret(
+        string definitionKey,
+        string? scopeType = null,
+        string? scopeId = null,
+        bool allScopes = false)
     {
         try
         {
-            await _secrets.DeleteSecretAsync(definitionKey, ActorId);
-            return JsonSerializer.Serialize(new { success = true, message = $"Secret for definition '{definitionKey}' deleted." }, JsonOptions);
+            // An agent must state which scope it means. Defaulting to
+            // all-scopes would let a model clear one user's credential and
+            // silently wipe every other user's along with it
+            // (rivoli-ai/andy-settings#138).
+            if (scopeType is null && !allScopes)
+            {
+                return JsonSerializer.Serialize(new
+                {
+                    error = "Specify scopeType (plus scopeId for non-Machine scopes), "
+                          + "or pass allScopes=true to delete every stored secret for this definition."
+                }, JsonOptions);
+            }
+
+            ScopeType? parsedScope = null;
+            if (scopeType is not null)
+            {
+                if (!Enum.TryParse<ScopeType>(scopeType, ignoreCase: true, out var parsed))
+                    return JsonSerializer.Serialize(new { error = $"Invalid scopeType '{scopeType}'. Valid values: {string.Join(", ", Enum.GetNames<ScopeType>())}" }, JsonOptions);
+                parsedScope = parsed;
+            }
+
+            var deleted = await _secrets.DeleteSecretAsync(definitionKey, parsedScope, scopeId, ActorId);
+
+            return deleted == 0
+                ? JsonSerializer.Serialize(new { error = $"No stored secret found for definition '{definitionKey}' at the requested scope." }, JsonOptions)
+                : JsonSerializer.Serialize(new { success = true, deleted, message = $"Deleted {deleted} secret(s) for definition '{definitionKey}'." }, JsonOptions);
         }
         catch (Exception ex)
         {

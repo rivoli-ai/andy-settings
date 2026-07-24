@@ -118,7 +118,7 @@ public class SecretApiTests : IClassFixture<CustomWebApplicationFactory>
     }
 
     [Fact]
-    public async Task DeleteSecret_ReturnsNoContent()
+    public async Task DeleteSecret_ScopedDelete_ReturnsNoContent()
     {
         var key = $"test.secret.delete.{Guid.NewGuid():N}";
         await CreateSecretDefinitionAsync(key);
@@ -128,12 +128,75 @@ public class SecretApiTests : IClassFixture<CustomWebApplicationFactory>
         var setResponse = await _client.PostAsJsonAsync($"/api/secrets/{key}", setBody, _jsonOptions);
         setResponse.StatusCode.Should().Be(HttpStatusCode.Created);
 
-        // Delete the secret
-        var deleteResponse = await _client.DeleteAsync($"/api/secrets/{key}");
+        var deleteResponse = await _client.DeleteAsync($"/api/secrets/{key}?scopeType=Machine");
         deleteResponse.StatusCode.Should().Be(HttpStatusCode.NoContent);
 
         // Verify it's gone
         var getResponse = await _client.GetAsync($"/api/secrets/{key}?scopeType=Machine");
         getResponse.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    // rivoli-ai/andy-settings#138. A bare DELETE used to wipe every scope for
+    // the definition. It is now rejected rather than silently reinterpreted as
+    // a narrower delete, which would leave the caller believing a still-stored
+    // secret was gone.
+    [Fact]
+    public async Task DeleteSecret_WithoutScope_ReturnsBadRequestAndDeletesNothing()
+    {
+        var key = $"test.secret.delete.{Guid.NewGuid():N}";
+        await CreateSecretDefinitionAsync(key);
+        await _client.PostAsJsonAsync($"/api/secrets/{key}",
+            new { scopeType = "Machine", value = "still-here" }, _jsonOptions);
+
+        var deleteResponse = await _client.DeleteAsync($"/api/secrets/{key}");
+
+        deleteResponse.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        var getResponse = await _client.GetAsync($"/api/secrets/{key}?scopeType=Machine");
+        getResponse.StatusCode.Should().Be(HttpStatusCode.OK, "nothing may be deleted by an ambiguous request");
+    }
+
+    [Fact]
+    public async Task DeleteSecret_AllScopes_RemovesEveryScope()
+    {
+        var key = $"test.secret.delete.{Guid.NewGuid():N}";
+        await CreateSecretDefinitionAsync(key);
+        await _client.PostAsJsonAsync($"/api/secrets/{key}",
+            new { scopeType = "Machine", value = "machine-value" }, _jsonOptions);
+        await _client.PostAsJsonAsync($"/api/secrets/{key}",
+            new { scopeType = "User", scopeId = "user1", value = "user-value" }, _jsonOptions);
+
+        var deleteResponse = await _client.DeleteAsync($"/api/secrets/{key}?allScopes=true");
+        deleteResponse.StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        (await _client.GetAsync($"/api/secrets/{key}?scopeType=Machine")).StatusCode
+            .Should().Be(HttpStatusCode.NotFound);
+        (await _client.GetAsync($"/api/secrets/{key}?scopeType=User&scopeId=user1")).StatusCode
+            .Should().Be(HttpStatusCode.NotFound);
+    }
+
+    // The whole point of the change: one user's secret can be cleared without
+    // taking out everyone else's.
+    [Fact]
+    public async Task DeleteSecret_ScopedDelete_LeavesOtherScopesIntact()
+    {
+        var key = $"test.secret.delete.{Guid.NewGuid():N}";
+        await CreateSecretDefinitionAsync(key);
+        await _client.PostAsJsonAsync($"/api/secrets/{key}",
+            new { scopeType = "Machine", value = "machine-value" }, _jsonOptions);
+        await _client.PostAsJsonAsync($"/api/secrets/{key}",
+            new { scopeType = "User", scopeId = "user1", value = "user1-value" }, _jsonOptions);
+        await _client.PostAsJsonAsync($"/api/secrets/{key}",
+            new { scopeType = "User", scopeId = "user2", value = "user2-value" }, _jsonOptions);
+
+        var deleteResponse = await _client.DeleteAsync($"/api/secrets/{key}?scopeType=User&scopeId=user1");
+        deleteResponse.StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        (await _client.GetAsync($"/api/secrets/{key}?scopeType=User&scopeId=user1")).StatusCode
+            .Should().Be(HttpStatusCode.NotFound);
+        (await _client.GetAsync($"/api/secrets/{key}?scopeType=User&scopeId=user2")).StatusCode
+            .Should().Be(HttpStatusCode.OK, "another user's secret must survive");
+        (await _client.GetAsync($"/api/secrets/{key}?scopeType=Machine")).StatusCode
+            .Should().Be(HttpStatusCode.OK, "the machine-scope secret must survive");
     }
 }

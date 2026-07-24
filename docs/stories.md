@@ -238,7 +238,7 @@ Full middleware pipeline:
 - `POST /api/secrets/{definitionKey}` -- set encrypted secret
 - `GET /api/secrets/{definitionKey}` -- get decrypted secret (requires `secret:read`)
 - `POST /api/secrets/{definitionKey}/rotate` -- rotate secret
-- `DELETE /api/secrets/{definitionKey}` -- remove secret
+- `DELETE /api/secrets/{definitionKey}?scopeType=&scopeId=` -- remove one scope's secret; `?allScopes=true` removes every scope. A request with neither is rejected with 400
 
 **Acceptance criteria:**
 - [ ] RBAC: `[RequirePermission("secret:read/write")]`

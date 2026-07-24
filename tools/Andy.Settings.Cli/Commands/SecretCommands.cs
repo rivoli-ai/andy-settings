@@ -186,20 +186,51 @@ public static class SecretCommands
         });
 
         // --- secrets delete ---
-        var deleteCommand = new Command("delete", "Delete a secret");
+        // Deletion is per-scope. `--all-scopes` is required to wipe every
+        // scope, so clearing one user's credential cannot silently take out
+        // the machine-scope value and every other user's
+        // (rivoli-ai/andy-settings#138).
+        var deleteCommand = new Command("delete", "Delete a secret at a scope, or every scope with --all-scopes");
         var deleteKeyArg = new Argument<string>("key", "The secret key");
+        var deleteScopeOption = new Option<string?>("--scope", "Scope (e.g. Machine, User, Team)");
+        var deleteScopeIdOption = new Option<string?>("--scope-id", "Scope identifier");
+        var deleteAllScopesOption = new Option<bool>("--all-scopes",
+            "Delete every stored secret for this definition, across all scopes");
         deleteCommand.AddArgument(deleteKeyArg);
+        deleteCommand.AddOption(deleteScopeOption);
+        deleteCommand.AddOption(deleteScopeIdOption);
+        deleteCommand.AddOption(deleteAllScopesOption);
 
         deleteCommand.SetHandler(async (InvocationContext ctx) =>
         {
             var apiUrl = ctx.ParseResult.GetValueForOption(apiUrlOption)!;
             var key = ctx.ParseResult.GetValueForArgument(deleteKeyArg);
+            var scope = ctx.ParseResult.GetValueForOption(deleteScopeOption);
+            var scopeId = ctx.ParseResult.GetValueForOption(deleteScopeIdOption);
+            var allScopes = ctx.ParseResult.GetValueForOption(deleteAllScopesOption);
+
+            if (string.IsNullOrEmpty(scope) && !allScopes)
+            {
+                Console.Error.WriteLine(
+                    "Specify --scope (and --scope-id for non-Machine scopes), "
+                    + "or pass --all-scopes to delete every stored secret for this definition.");
+                ctx.ExitCode = 1;
+                return;
+            }
 
             using var client = HttpClientFactory.Create(apiUrl);
 
+            var queryParams = new List<string>();
+            if (!string.IsNullOrEmpty(scope)) queryParams.Add($"scopeType={Uri.EscapeDataString(scope)}");
+            if (!string.IsNullOrEmpty(scopeId)) queryParams.Add($"scopeId={Uri.EscapeDataString(scopeId)}");
+            if (allScopes) queryParams.Add("allScopes=true");
+
+            var url = $"api/secrets/{Uri.EscapeDataString(key)}";
+            if (queryParams.Count > 0) url += "?" + string.Join("&", queryParams);
+
             try
             {
-                var response = await client.DeleteAsync($"api/secrets/{Uri.EscapeDataString(key)}");
+                var response = await client.DeleteAsync(url);
                 var body = await response.Content.ReadAsStringAsync();
 
                 if (!response.IsSuccessStatusCode)

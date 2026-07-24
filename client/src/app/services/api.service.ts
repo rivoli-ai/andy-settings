@@ -73,8 +73,17 @@ export class ApiService {
     return this.http.post(`${this.baseUrl}/secrets/${encodeURIComponent(definitionKey)}/rotate`, body);
   }
 
-  deleteSecret(definitionKey: string): Observable<any> {
-    return this.http.delete(`${this.baseUrl}/secrets/${encodeURIComponent(definitionKey)}`);
+  // Deletion is per-scope. allScopes must be requested explicitly so clearing
+  // one user's credential cannot silently wipe every other scope too.
+  deleteSecret(
+    definitionKey: string,
+    opts: { scopeType?: string; scopeId?: string | null; allScopes?: boolean }
+  ): Observable<any> {
+    let params = new HttpParams();
+    if (opts.scopeType) params = params.set('scopeType', opts.scopeType);
+    if (opts.scopeId) params = params.set('scopeId', opts.scopeId);
+    if (opts.allScopes) params = params.set('allScopes', 'true');
+    return this.http.delete(`${this.baseUrl}/secrets/${encodeURIComponent(definitionKey)}`, { params });
   }
 
   // Effective resolution

@@ -146,9 +146,33 @@ public class ExportImportService : IExportImportService
         var updatedAssignments = 0;
         var now = DateTimeOffset.UtcNow;
 
+        // Load every definition the document touches in ONE query, plus the
+        // assignments belonging to them, instead of a lookup per item. Import
+        // previously issued two round trips per definition and two per
+        // assignment, all inside an open transaction, so a 10k-row document was
+        // 20k+ sequential queries holding a write transaction the whole time
+        // (rivoli-ai/andy-settings#140).
+        var documentKeys = document.Definitions.Select(d => d.Key).ToList();
+        var definitionsByKey = await _db.SettingDefinitions
+            .Where(d => documentKeys.Contains(d.Key))
+            .ToDictionaryAsync(d => d.Key, StringComparer.Ordinal, ct);
+
+        var existingIds = definitionsByKey.Values.Select(d => d.Id).ToList();
+        var storedAssignmentKeys = await _db.SettingAssignments
+            .Where(a => existingIds.Contains(a.DefinitionId))
+            .Select(a => a.DefinitionId)
+            .Distinct()
+            .ToListAsync(ct);
+        var storedSecretKeys = await _db.EncryptedSecrets
+            .Where(s => existingIds.Contains(s.DefinitionId))
+            .Select(s => s.DefinitionId)
+            .Distinct()
+            .ToListAsync(ct);
+        var definitionsWithStoredValues = storedAssignmentKeys.Concat(storedSecretKeys).ToHashSet();
+
         foreach (var item in document.Definitions)
         {
-            var definition = await _db.SettingDefinitions.FirstOrDefaultAsync(d => d.Key == item.Key, ct);
+            var definition = definitionsByKey.GetValueOrDefault(item.Key);
             if (definition is null)
             {
                 definition = new SettingDefinition { Id = Guid.NewGuid(), Key = item.Key, CreatedAt = now };
@@ -160,9 +184,7 @@ public class ExportImportService : IExportImportService
             {
                 var wasSecret = definition.IsSecret || definition.DataType == SettingDataType.Secret;
                 var willBeSecret = item.IsSecret || item.DataType == SettingDataType.Secret;
-                if (wasSecret != willBeSecret &&
-                    (await _db.SettingAssignments.AnyAsync(a => a.DefinitionId == definition.Id, ct) ||
-                     await _db.EncryptedSecrets.AnyAsync(s => s.DefinitionId == definition.Id, ct)))
+                if (wasSecret != willBeSecret && definitionsWithStoredValues.Contains(definition.Id))
                     throw new InvalidDataException(
                         $"Definition '{item.Key}' has stored values and cannot switch secret storage mode.");
                 ApplyDefinition(definition, item, now);
@@ -172,8 +194,16 @@ public class ExportImportService : IExportImportService
 
         await _db.SaveChangesAsync(ct);
         var importedDefinitions = await _db.SettingDefinitions
-            .Where(d => document.Definitions.Select(x => x.Key).Contains(d.Key))
-            .ToDictionaryAsync(d => d.Key, ct);
+            .Where(d => documentKeys.Contains(d.Key))
+            .ToDictionaryAsync(d => d.Key, StringComparer.Ordinal, ct);
+
+        // One query for every assignment the document could touch, indexed for
+        // in-memory lookup, instead of a FirstOrDefaultAsync per row.
+        var importedIds = importedDefinitions.Values.Select(d => d.Id).ToList();
+        var assignmentsByIdentity = (await _db.SettingAssignments
+                .Where(a => importedIds.Contains(a.DefinitionId))
+                .ToListAsync(ct))
+            .ToDictionary(a => (a.DefinitionId, a.ScopeType, a.ScopeKey));
 
         // Changes are collected as they are applied so the audit rows can be
         // written after the transaction commits, while the config events go
@@ -183,9 +213,8 @@ public class ExportImportService : IExportImportService
         foreach (var item in document.Assignments)
         {
             var definition = importedDefinitions[item.DefinitionKey];
-            var existing = await _db.SettingAssignments.FirstOrDefaultAsync(a =>
-                a.DefinitionId == definition.Id && a.ScopeType == item.ScopeType &&
-                a.ScopeKey == (item.ScopeId ?? string.Empty), ct);
+            assignmentsByIdentity.TryGetValue(
+                (definition.Id, item.ScopeType, item.ScopeId ?? string.Empty), out var existing);
             if (existing is null)
             {
                 var created = new SettingAssignment
