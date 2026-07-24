@@ -13,8 +13,13 @@ namespace Andy.Settings.Api.Controllers;
 public class DefinitionsController : ControllerBase
 {
     private readonly IDefinitionService _service;
+    private readonly ICurrentUserService _currentUser;
 
-    public DefinitionsController(IDefinitionService service) => _service = service;
+    public DefinitionsController(IDefinitionService service, ICurrentUserService currentUser)
+    {
+        _service = service;
+        _currentUser = currentUser;
+    }
 
     [HttpGet]
     [RequirePermission("definition:read")]
@@ -43,7 +48,7 @@ public class DefinitionsController : ControllerBase
     {
         try
         {
-            var result = await _service.CreateAsync(dto, ct);
+            var result = await _service.CreateAsync(dto, _currentUser.GetUserId(), ct);
             return CreatedAtAction(nameof(Get), new { key = result.Key }, result);
         }
         catch (InvalidOperationException ex) when (
@@ -66,7 +71,7 @@ public class DefinitionsController : ControllerBase
     {
         try
         {
-            var result = await _service.UpdateAsync(key, dto, ct);
+            var result = await _service.UpdateAsync(key, dto, _currentUser.GetUserId(), ct);
             return Ok(result);
         }
         catch (KeyNotFoundException)
@@ -87,7 +92,7 @@ public class DefinitionsController : ControllerBase
     {
         try
         {
-            await _service.DeleteAsync(key, ct);
+            await _service.DeleteAsync(key, _currentUser.GetUserId(), ct);
             return NoContent();
         }
         catch (KeyNotFoundException)

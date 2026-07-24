@@ -444,7 +444,7 @@ public class SettingsMcpToolsTests
             AssignmentCount: 0);
 
         _definitionService
-            .Setup(s => s.CreateAsync(It.IsAny<CreateDefinitionDto>(), It.IsAny<CancellationToken>()))
+            .Setup(s => s.CreateAsync(It.IsAny<CreateDefinitionDto>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(definition);
 
         // Act
@@ -480,7 +480,7 @@ public class SettingsMcpToolsTests
             AssignmentCount: 0);
 
         _definitionService
-            .Setup(s => s.UpdateAsync("app.theme", It.IsAny<UpdateDefinitionDto>(), It.IsAny<CancellationToken>()))
+            .Setup(s => s.UpdateAsync("app.theme", It.IsAny<UpdateDefinitionDto>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(definition);
 
         // Act
@@ -497,7 +497,7 @@ public class SettingsMcpToolsTests
     {
         // Arrange
         _definitionService
-            .Setup(s => s.DeleteAsync("app.theme", It.IsAny<CancellationToken>()))
+            .Setup(s => s.DeleteAsync("app.theme", It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
         // Act
@@ -507,7 +507,7 @@ public class SettingsMcpToolsTests
         var doc = JsonDocument.Parse(json);
         doc.RootElement.GetProperty("success").GetBoolean().Should().BeTrue();
         doc.RootElement.GetProperty("message").GetString().Should().Contain("app.theme");
-        _definitionService.Verify(s => s.DeleteAsync("app.theme", It.IsAny<CancellationToken>()), Times.Once);
+        _definitionService.Verify(s => s.DeleteAsync("app.theme", It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]

@@ -12,11 +12,13 @@ namespace Andy.Settings.Tests.Unit.Controllers;
 public class DefinitionsControllerTests
 {
     private readonly Mock<IDefinitionService> _serviceMock = new();
+    private readonly Mock<ICurrentUserService> _currentUser = new();
     private readonly DefinitionsController _sut;
 
     public DefinitionsControllerTests()
     {
-        _sut = new DefinitionsController(_serviceMock.Object);
+        _currentUser.Setup(c => c.GetUserId()).Returns("definitions-caller");
+        _sut = new DefinitionsController(_serviceMock.Object, _currentUser.Object);
     }
 
     private static DefinitionDto MakeDefinitionDto(string key = "app.test.key") => new(
@@ -90,7 +92,7 @@ public class DefinitionsControllerTests
             DataType = SettingDataType.String
         };
         var dto = MakeDefinitionDto("app.new.key");
-        _serviceMock.Setup(s => s.CreateAsync(createDto, It.IsAny<CancellationToken>()))
+        _serviceMock.Setup(s => s.CreateAsync(createDto, It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(dto);
 
         var result = await _sut.Create(createDto, CancellationToken.None);
@@ -110,7 +112,7 @@ public class DefinitionsControllerTests
             DisplayName = "Existing",
             DataType = SettingDataType.String
         };
-        _serviceMock.Setup(s => s.CreateAsync(createDto, It.IsAny<CancellationToken>()))
+        _serviceMock.Setup(s => s.CreateAsync(createDto, It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("Duplicate key"));
 
         var result = await _sut.Create(createDto, CancellationToken.None);
@@ -124,7 +126,7 @@ public class DefinitionsControllerTests
     {
         var updateDto = new UpdateDefinitionDto { DisplayName = "Updated" };
         var dto = MakeDefinitionDto();
-        _serviceMock.Setup(s => s.UpdateAsync("app.test.key", updateDto, It.IsAny<CancellationToken>()))
+        _serviceMock.Setup(s => s.UpdateAsync("app.test.key", updateDto, It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(dto);
 
         var result = await _sut.Update("app.test.key", updateDto, CancellationToken.None);
@@ -137,7 +139,7 @@ public class DefinitionsControllerTests
     public async Task Update_MissingKey_Returns404()
     {
         var updateDto = new UpdateDefinitionDto { DisplayName = "Updated" };
-        _serviceMock.Setup(s => s.UpdateAsync("missing.key", updateDto, It.IsAny<CancellationToken>()))
+        _serviceMock.Setup(s => s.UpdateAsync("missing.key", updateDto, It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new KeyNotFoundException());
 
         var result = await _sut.Update("missing.key", updateDto, CancellationToken.None);
@@ -148,7 +150,7 @@ public class DefinitionsControllerTests
     [Fact]
     public async Task Delete_ExistingKey_Returns204()
     {
-        _serviceMock.Setup(s => s.DeleteAsync("app.test.key", It.IsAny<CancellationToken>()))
+        _serviceMock.Setup(s => s.DeleteAsync("app.test.key", It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
         var result = await _sut.Delete("app.test.key", CancellationToken.None);
@@ -159,7 +161,7 @@ public class DefinitionsControllerTests
     [Fact]
     public async Task Delete_MissingKey_Returns404()
     {
-        _serviceMock.Setup(s => s.DeleteAsync("missing.key", It.IsAny<CancellationToken>()))
+        _serviceMock.Setup(s => s.DeleteAsync("missing.key", It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new KeyNotFoundException());
 
         var result = await _sut.Delete("missing.key", CancellationToken.None);

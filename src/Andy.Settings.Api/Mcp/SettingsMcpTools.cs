@@ -273,7 +273,7 @@ public class SettingsMcpTools
                 DefaultValueJson = defaultValueJson,
                 IsSecret = isSecret,
             };
-            var result = await _definitions.CreateAsync(dto);
+            var result = await _definitions.CreateAsync(dto, ActorId);
             return JsonSerializer.Serialize(result, JsonOptions);
         }
         catch (Exception ex)
@@ -301,7 +301,7 @@ public class SettingsMcpTools
                 Category = category,
                 IsDeprecated = isDeprecated,
             };
-            var result = await _definitions.UpdateAsync(key, dto);
+            var result = await _definitions.UpdateAsync(key, dto, ActorId);
             return JsonSerializer.Serialize(result, JsonOptions);
         }
         catch (Exception ex)
@@ -317,7 +317,7 @@ public class SettingsMcpTools
     {
         try
         {
-            await _definitions.DeleteAsync(key);
+            await _definitions.DeleteAsync(key, ActorId);
             return JsonSerializer.Serialize(new { success = true, message = $"Definition '{key}' deleted." }, JsonOptions);
         }
         catch (Exception ex)

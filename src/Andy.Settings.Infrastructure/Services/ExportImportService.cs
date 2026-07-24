@@ -1,10 +1,13 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Andy.Settings.Application.DTOs.ImportExport;
+using Andy.Settings.Application.DTOs.Audit;
 using Andy.Settings.Application.Interfaces;
+using Andy.Settings.Application.Messaging.Events;
 using Andy.Settings.Domain.Entities;
 using Andy.Settings.Domain.Enums;
 using Andy.Settings.Infrastructure.Data;
+using Andy.Settings.Infrastructure.Messaging;
 using Microsoft.EntityFrameworkCore;
 
 namespace Andy.Settings.Infrastructure.Services;
@@ -20,11 +23,13 @@ public class ExportImportService : IExportImportService
 
     private readonly SettingsDbContext _db;
     private readonly IValidationService _validation;
+    private readonly IAuditService _audit;
 
-    public ExportImportService(SettingsDbContext db, IValidationService validation)
+    public ExportImportService(SettingsDbContext db, IValidationService validation, IAuditService audit)
     {
         _db = db;
         _validation = validation;
+        _audit = audit;
     }
 
     public async Task<ExportResult> ExportAsync(ExportOptions options, CancellationToken ct = default)
@@ -170,6 +175,11 @@ public class ExportImportService : IExportImportService
             .Where(d => document.Definitions.Select(x => x.Key).Contains(d.Key))
             .ToDictionaryAsync(d => d.Key, ct);
 
+        // Changes are collected as they are applied so the audit rows can be
+        // written after the transaction commits, while the config events go
+        // into the same SaveChanges as the mutation itself.
+        var auditable = new List<(string Key, ScopeType ScopeType, string? ScopeId, string? Before, string After)>();
+
         foreach (var item in document.Assignments)
         {
             var definition = importedDefinitions[item.DefinitionKey];
@@ -178,27 +188,49 @@ public class ExportImportService : IExportImportService
                 a.ScopeKey == (item.ScopeId ?? string.Empty), ct);
             if (existing is null)
             {
-                _db.SettingAssignments.Add(new SettingAssignment
+                var created = new SettingAssignment
                 {
                     Id = Guid.NewGuid(), DefinitionId = definition.Id, ScopeType = item.ScopeType,
                     ScopeId = item.ScopeId, ValueJson = item.ValueJson, Etag = Guid.NewGuid().ToString("N"),
                     Version = 1, UpdatedBy = actorId, CreatedAt = now, UpdatedAt = now
-                });
+                };
+                _db.SettingAssignments.Add(created);
+
+                // Import wrote assignments directly and published nothing, so
+                // every consumer kept serving the pre-import value indefinitely
+                // (rivoli-ai/andy-settings#135). Same outbox helper the REST
+                // write path uses, in the same unit of work.
+                _db.AppendConfigChanged(created, definition, ConfigEventKind.Created, item.ValueJson);
+                auditable.Add((definition.Key, item.ScopeType, item.ScopeId, null, item.ValueJson));
                 createdAssignments++;
             }
             else if (existing.ValueJson != item.ValueJson)
             {
+                var before = existing.ValueJson;
                 existing.ValueJson = item.ValueJson;
                 existing.Etag = Guid.NewGuid().ToString("N");
                 existing.Version++;
                 existing.UpdatedBy = actorId;
                 existing.UpdatedAt = now;
+
+                _db.AppendConfigChanged(existing, definition, ConfigEventKind.Updated, item.ValueJson);
+                auditable.Add((definition.Key, item.ScopeType, item.ScopeId, before, item.ValueJson));
                 updatedAssignments++;
             }
         }
 
         await _db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
+
+        // AuditEventType.Imported was declared but never written by anything.
+        // One row per changed key, so "what did that import actually touch?"
+        // is answerable from the audit trail.
+        foreach (var (key, scopeType, scopeId, before, after) in auditable)
+        {
+            await _audit.RecordAsync(new(Guid.NewGuid(), AuditEventType.Imported,
+                key, scopeType, scopeId, "User", actorId,
+                before, after, null, DateTimeOffset.UtcNow), ct);
+        }
         return new ImportResult
         {
             DefinitionsCreated = createdDefinitions,
