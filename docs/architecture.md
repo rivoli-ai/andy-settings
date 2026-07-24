@@ -125,7 +125,7 @@ Fields:
 
 - definition ID
 - scope type / scope ID
-- encrypted value (AES-256-GCM via ASP.NET Core Data Protection)
+- encrypted value (AES-256-CBC + HMAC-SHA256 via ASP.NET Core Data Protection)
 - created at / rotated at
 
 Secrets are:
@@ -258,7 +258,7 @@ Swagger UI at `/swagger` (development only). Full OpenAPI spec with JWT security
 ### Authentication
 
 - Web UI: OIDC with Andy Auth
-- CLI: OAuth Device Flow
+- CLI: bearer token via `ANDY_SETTINGS_TOKEN` (OAuth Device Flow is planned, not implemented)
 - API: JWT Bearer tokens
 - Conductor: tokens forwarded through UnifiedProxy
 - Embedded mode: local bootstrap for first-run (localhost-only, auto-disabled after setup)

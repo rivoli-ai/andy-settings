@@ -45,6 +45,7 @@ public static class AuditCommands
                 if (!response.IsSuccessStatusCode)
                 {
                     Console.Error.WriteLine($"Error {(int)response.StatusCode}: {body}");
+                    ctx.ExitCode = 1;
                     return;
                 }
 
@@ -84,6 +85,7 @@ public static class AuditCommands
             catch (HttpRequestException ex)
             {
                 Console.Error.WriteLine($"Connection error: {ex.Message}");
+                ctx.ExitCode = 1;
             }
         });
 

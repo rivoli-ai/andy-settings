@@ -44,7 +44,7 @@ The resolution engine returns effective values with full explanation metadata --
 
 ### 3. Encrypted Secrets
 
-Secret-bearing settings are encrypted using ASP.NET Core Data Protection API (AES-256-GCM):
+Secret-bearing settings are encrypted using ASP.NET Core Data Protection API (AES-256-CBC for confidentiality, HMAC-SHA256 for authentication — the framework default):
 
 - Encrypted at rest in the database
 - Only decrypted for users with `secret:read` RBAC permission
