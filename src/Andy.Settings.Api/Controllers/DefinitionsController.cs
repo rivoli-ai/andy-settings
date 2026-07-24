@@ -1,5 +1,6 @@
 using Andy.Settings.Application.DTOs.Common;
 using Andy.Settings.Application.DTOs.Definitions;
+using Andy.Settings.Application.Exceptions;
 using Andy.Settings.Application.Interfaces;
 using Andy.Rbac.Authorization;
 using Microsoft.AspNetCore.Authorization;
@@ -51,9 +52,7 @@ public class DefinitionsController : ControllerBase
             var result = await _service.CreateAsync(dto, _currentUser.GetUserId(), ct);
             return CreatedAtAction(nameof(Get), new { key = result.Key }, result);
         }
-        catch (InvalidOperationException ex) when (
-            ex.Message.Contains("already exists", StringComparison.OrdinalIgnoreCase) ||
-            ex.Message.Contains("duplicate", StringComparison.OrdinalIgnoreCase))
+        catch (DuplicateKeyException ex)
         {
             return Conflict(new { error = ex.Message });
         }

@@ -34,4 +34,23 @@ public sealed class OutboxDispatcherOptions
     // quarantined.
     public TimeSpan BackoffBase { get; set; } = TimeSpan.FromSeconds(1);
     public TimeSpan BackoffMax { get; set; } = TimeSpan.FromMinutes(5);
+
+    /// <summary>
+    /// Attempts after which a row is treated as dead-lettered and stops being
+    /// considered for dispatch.
+    /// </summary>
+    /// <remarks>
+    /// Without a terminal state a permanently-failing row stays pending
+    /// forever. Once the number of such rows exceeds the fetch window, the
+    /// dispatcher's batch fills with them and NEW events are never published —
+    /// config changes silently stop propagating to every consumer
+    /// (rivoli-ai/andy-settings#139).
+    ///
+    /// Dead-lettering is expressed through AttemptCount rather than a new
+    /// column, so no migration is needed and the row remains in the table:
+    /// the outbox still doubles as an audit log, and an operator can requeue by
+    /// resetting AttemptCount to 0. At the default backoff a row reaches this
+    /// after roughly an hour of retrying.
+    /// </remarks>
+    public int MaxAttempts { get; set; } = 12;
 }

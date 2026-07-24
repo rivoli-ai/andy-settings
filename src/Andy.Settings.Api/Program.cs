@@ -27,6 +27,32 @@ var serverUrl = configuredUrl != null && !configuredUrl.Contains("://+:") && !co
 var protectedResourceUrl = $"{serverUrl}/mcp";
 var andyAuthAuthority = builder.Configuration["AndyAuth:Authority"] ?? "";
 
+// ── Auth bypass guard ───────────────────────────────────────────────────────
+// Two independent switches turn off all access control: an empty
+// AndyAuth:Authority disables authentication entirely, and Development
+// registers AllowAllDevPolicyProvider, which satisfies EVERY [RequirePermission]
+// on every controller and MCP tool. Both are keyed on configuration that a
+// deployment can drift into silently — docker-compose.yml ships with both
+// active — and a settings-and-secrets API that comes up unauthenticated logs
+// nothing unusual while doing it.
+//
+// Messaging already fails loud for exactly this class of mistake (see the AK1
+// guard below). This is the symmetric guard for auth
+// (rivoli-ai/andy-settings#144). ANDY_ALLOW_INSECURE_AUTH exists so that
+// running without auth is a deliberate act rather than an environment-name
+// coincidence.
+var allowInsecureAuth = string.Equals(
+    Environment.GetEnvironmentVariable("ANDY_ALLOW_INSECURE_AUTH"), "true", StringComparison.OrdinalIgnoreCase);
+
+if (string.IsNullOrEmpty(andyAuthAuthority) && !builder.Environment.IsDevelopment() && !allowInsecureAuth)
+{
+    throw new InvalidOperationException(
+        $"AndyAuth:Authority must be set in {builder.Environment.EnvironmentName}. " +
+        "It is empty, which disables authentication for the entire API — including " +
+        "the secrets endpoints. Set AndyAuth__Authority on the host, or set " +
+        "ANDY_ALLOW_INSECURE_AUTH=true to run without authentication deliberately.");
+}
+
 // ── JSON options ────────────────────────────────────────────────────────────
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
@@ -185,6 +211,9 @@ if (!string.IsNullOrEmpty(rbacBaseUrl))
 
     if (builder.Environment.IsDevelopment())
     {
+        // Satisfies every policy, so all [RequirePermission] checks pass. Only
+        // reachable in Development — the guard at the top of this file stops a
+        // non-Development host from booting into an unauthenticated state.
         builder.Services.AddSingleton<IAuthorizationPolicyProvider>(sp =>
         {
             var opts = sp.GetRequiredService<IOptions<AuthorizationOptions>>();
@@ -284,6 +313,22 @@ app.MapGet("/openapi.json", () => Results.Redirect("/swagger/v1/swagger.json"))
 if (app.Environment.IsDevelopment())
 {
     app.UseSwaggerUI();
+}
+
+// An active auth bypass must be obvious in the log, not inferred from config
+// (rivoli-ai/andy-settings#144).
+if (string.IsNullOrEmpty(andyAuthAuthority) || app.Environment.IsDevelopment())
+{
+    var startupLogger = app.Services.GetRequiredService<ILoggerFactory>()
+        .CreateLogger("Andy.Settings.Startup");
+    if (string.IsNullOrEmpty(andyAuthAuthority))
+        startupLogger.LogWarning(
+            "[INSECURE] AndyAuth:Authority is empty — authentication is DISABLED for the entire API, "
+            + "including the secrets endpoints. Never run like this outside local development.");
+    if (app.Environment.IsDevelopment() && !string.IsNullOrEmpty(rbacBaseUrl))
+        startupLogger.LogWarning(
+            "[INSECURE] Development environment — RBAC permission checks are BYPASSED; "
+            + "every [RequirePermission] is satisfied automatically.");
 }
 
 // ── Schema migration + definition seeding ───────────────────────────────────

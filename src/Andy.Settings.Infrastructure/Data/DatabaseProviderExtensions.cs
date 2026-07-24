@@ -27,6 +27,7 @@ public static class DatabaseProviderExtensions
                 }
 
                 options.UseSqlite(connectionString);
+                options.AddInterceptors(new SqliteConcurrencyInterceptor());
             }
             else
             {

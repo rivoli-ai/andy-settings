@@ -1,4 +1,5 @@
 using Andy.Settings.Application.DTOs.Common;
+using Andy.Settings.Application.Exceptions;
 using Andy.Settings.Application.DTOs.Definitions;
 using Andy.Settings.Application.Interfaces;
 using Andy.Settings.Application.Messaging.Events;
@@ -76,7 +77,7 @@ public class DefinitionRepository : IDefinitionService
     {
         var existing = await _db.SettingDefinitions.AnyAsync(d => d.Key == dto.Key, ct);
         if (existing)
-            throw new InvalidOperationException($"Definition with key '{dto.Key}' already exists.");
+            throw new DuplicateKeyException($"Definition with key '{dto.Key}' already exists.");
 
         if ((dto.IsSecret || dto.DataType == SettingDataType.Secret) && dto.DefaultValueJson is not null)
             throw new InvalidOperationException("Secret definitions cannot contain plaintext default values.");

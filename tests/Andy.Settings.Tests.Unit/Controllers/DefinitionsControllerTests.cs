@@ -1,5 +1,6 @@
 using Andy.Settings.Api.Controllers;
 using Andy.Settings.Application.DTOs.Common;
+using Andy.Settings.Application.Exceptions;
 using Andy.Settings.Application.DTOs.Definitions;
 using Andy.Settings.Application.Interfaces;
 using Andy.Settings.Domain.Enums;
@@ -113,7 +114,7 @@ public class DefinitionsControllerTests
             DataType = SettingDataType.String
         };
         _serviceMock.Setup(s => s.CreateAsync(createDto, It.IsAny<string?>(), It.IsAny<CancellationToken>()))
-            .ThrowsAsync(new InvalidOperationException("Duplicate key"));
+            .ThrowsAsync(new DuplicateKeyException("Definition with key 'app.existing.key' already exists."));
 
         var result = await _sut.Create(createDto, CancellationToken.None);
 
