@@ -1,4 +1,5 @@
 using System.CommandLine;
+using Andy.Settings.Cli;
 using Andy.Settings.Cli.Commands;
 
 var rootCommand = new RootCommand("Andy Settings CLI - Manage application settings and configuration");
@@ -16,6 +17,21 @@ var formatOption = new Option<string>(
     description: "Output format (table or json)");
 formatOption.FromAmong("table", "json");
 rootCommand.AddGlobalOption(formatOption);
+
+// Certificate validation is on by default — this CLI carries bearer tokens
+// and plaintext secrets. The bypass has to be asked for explicitly
+// (rivoli-ai/andy-settings#129).
+var insecureOption = new Option<bool>(
+    "--insecure",
+    description: "Skip TLS certificate validation. For local development against "
+               + "self-signed certificates only — never against a production host.");
+rootCommand.AddGlobalOption(insecureOption);
+
+if (rootCommand.Parse(args).GetValueForOption(insecureOption)
+    || HttpClientFactory.InsecureRequestedViaEnvironment())
+{
+    HttpClientFactory.AllowInsecureTls();
+}
 
 // Auth commands (auth login, auth logout)
 rootCommand.AddCommand(AuthCommands.Build());

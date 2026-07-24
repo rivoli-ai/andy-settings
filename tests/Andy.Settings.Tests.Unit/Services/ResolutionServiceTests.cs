@@ -170,6 +170,76 @@ public class ResolutionServiceTests : IDisposable
         winner.ValueJson.Should().Be("\"user-value\"");
     }
 
+    // rivoli-ai/andy-settings#130. The definition's default is carried in the
+    // chain as a synthetic Machine/null entry, so a Machine-scope assignment
+    // winning used to mark BOTH it and the default — and any consumer taking
+    // the first winner displayed the default value against the wrong source.
+    [Fact]
+    public async Task Explain_MachineScopeWins_MarksOnlyTheAssignment()
+    {
+        var def = await SeedDefinition();
+        await SeedAssignment(def.Id, ScopeType.Machine, null, "\"machine-value\"");
+
+        var result = await _sut.ExplainAsync("app.test.key", new ResolutionContext());
+
+        var winner = result.SourceChain.Single(e => e.IsWinner);
+        winner.ValueJson.Should().Be("\"machine-value\"");
+        winner.IsDefault.Should().BeFalse();
+        result.EffectiveValue.Should().Be("\"machine-value\"");
+    }
+
+    [Fact]
+    public async Task Explain_DefaultWins_MarksTheDefaultEntry()
+    {
+        await SeedDefinition();
+
+        var result = await _sut.ExplainAsync("app.test.key", new ResolutionContext());
+
+        var winner = result.SourceChain.Single(e => e.IsWinner);
+        winner.IsDefault.Should().BeTrue();
+        winner.ValueJson.Should().Be("\"default-value\"");
+        result.IsDefault.Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData(ScopeType.Machine, null)]
+    [InlineData(ScopeType.Application, "testapp")]
+    [InlineData(ScopeType.User, "user1")]
+    [InlineData(ScopeType.Team, "team1")]
+    [InlineData(ScopeType.Workspace, "ws1")]
+    [InlineData(ScopeType.RuntimeOverride, "user1")]
+    public async Task Explain_NeverMarksMoreThanOneWinner(ScopeType scopeType, string? scopeId)
+    {
+        var def = await SeedDefinition();
+        await SeedAssignment(def.Id, ScopeType.Machine, null, "\"machine-value\"");
+        if (scopeType != ScopeType.Machine)
+            await SeedAssignment(def.Id, scopeType, scopeId, "\"scoped-value\"");
+
+        var context = new ResolutionContext
+        {
+            ApplicationCode = "testapp",
+            UserId = "user1",
+            TeamId = "team1",
+            WorkspaceId = "ws1"
+        };
+        var result = await _sut.ExplainAsync("app.test.key", context);
+
+        result.SourceChain.Count(e => e.IsWinner).Should().Be(1);
+        result.SourceChain.Single(e => e.IsWinner).ValueJson.Should().Be(result.EffectiveValue);
+    }
+
+    [Fact]
+    public async Task Explain_NoDefaultAndNoAssignment_MarksNoWinner()
+    {
+        await SeedDefinition(defaultValueJson: null);
+
+        var result = await _sut.ExplainAsync("app.test.key", new ResolutionContext());
+
+        result.SourceChain.Should().BeEmpty();
+        result.EffectiveValue.Should().BeNull();
+        result.IsDefault.Should().BeTrue();
+    }
+
     [Fact]
     public async Task ResolveBatch_HandlesMultipleKeys()
     {

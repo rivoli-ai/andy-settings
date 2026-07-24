@@ -61,10 +61,19 @@ public class ResolutionService : IResolutionService
         string? winningScopeId = null;
         bool isDefault = true;
 
+        // Index of the winning entry within sourceChain. Tracked positionally
+        // rather than re-matched by (ScopeType, ScopeId) afterwards: the
+        // synthetic default entry below reports Machine/null, so a predicate
+        // match would also select it whenever a real Machine-scope assignment
+        // won, marking two winners (rivoli-ai/andy-settings#130).
+        int winningChainIndex = -1;
+
         // Add default as base entry
         if (includeSourceChain && definition.DefaultValueJson is not null)
         {
-            sourceChain.Add(new SourceChainEntry(ScopeType.Machine, null, definition.DefaultValueJson, false));
+            sourceChain.Add(new SourceChainEntry(
+                ScopeType.Machine, null, definition.DefaultValueJson, IsWinner: false, IsDefault: true));
+            winningChainIndex = 0;
         }
 
         // Evaluate each scope level in precedence order
@@ -74,17 +83,20 @@ public class ResolutionService : IResolutionService
                 a.ScopeType == scopeType &&
                 (scopeId is null ? a.ScopeId == null : a.ScopeId == scopeId));
 
-            if (match is not null)
-            {
-                winningValue = match.ValueJson;
-                winningScopeType = scopeType;
-                winningScopeId = match.ScopeId;
-                isDefault = false;
-            }
+            if (match is null)
+                continue;
 
-            if (includeSourceChain && match is not null)
+            winningValue = match.ValueJson;
+            winningScopeType = scopeType;
+            winningScopeId = match.ScopeId;
+            isDefault = false;
+
+            if (includeSourceChain)
             {
-                sourceChain.Add(new SourceChainEntry(scopeType, match.ScopeId, match.ValueJson, false));
+                // Highest-precedence match wins; each later match overwrites
+                // the index, so the last one added is the winner.
+                winningChainIndex = sourceChain.Count;
+                sourceChain.Add(new SourceChainEntry(scopeType, match.ScopeId, match.ValueJson, IsWinner: false));
             }
         }
 
@@ -94,20 +106,10 @@ public class ResolutionService : IResolutionService
             winningValue = definition.DefaultValueJson;
         }
 
-        // Mark the winner in the source chain
-        if (includeSourceChain)
+        // Mark exactly one winner.
+        if (includeSourceChain && winningChainIndex >= 0)
         {
-            sourceChain = sourceChain.Select(e =>
-                e.ScopeType == winningScopeType && e.ScopeId == winningScopeId && !isDefault
-                    ? e with { IsWinner = true }
-                    : e
-            ).ToList();
-
-            // If default wins, mark the default entry
-            if (isDefault && sourceChain.Count > 0)
-            {
-                sourceChain[0] = sourceChain[0] with { IsWinner = true };
-            }
+            sourceChain[winningChainIndex] = sourceChain[winningChainIndex] with { IsWinner = true };
         }
 
         return new ResolvedSetting
