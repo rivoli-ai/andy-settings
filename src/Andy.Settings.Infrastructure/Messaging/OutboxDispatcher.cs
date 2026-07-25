@@ -92,20 +92,22 @@ public sealed class OutboxDispatcher : BackgroundService
 
         var now = DateTimeOffset.UtcNow;
 
-        // Fetch unordered then sort in-memory. SQLite (used in the
-        // Conductor-embedded deployment) refuses to ORDER BY
-        // DateTimeOffset server-side; the batch cap bounds the working
-        // set so the client-side sort is cheap. Take(BatchSize * 2) so
-        // we don't miss freshly-inserted older rows under a steady
-        // burst — still bounded.
-        var rawPending = await db.Set<OutboxEntry>()
-            .Where(e => e.PublishedAt == null)
-            .Take(_options.BatchSize * 2)
-            .ToListAsync(ct);
-        var pending = rawPending
+        // Ordered server-side, and dead-lettered rows are excluded in SQL.
+        //
+        // This used to fetch Take(BatchSize * 2) with NO ORDER BY and sort
+        // client-side, on the grounds that SQLite "refuses to ORDER BY
+        // DateTimeOffset". That is no longer true — SettingsDbContext.
+        // ConfigureConventions binds DateTimeOffsetToBinaryConverter for SQLite
+        // so the comparison translates — and the unordered fetch was actively
+        // harmful: once permanently-failing rows exceeded the fetch window,
+        // they filled every batch and new events were never published at all
+        // (rivoli-ai/andy-settings#139). The composite index on
+        // (PublishedAt, CreatedAt) covers this query.
+        var pending = await db.Set<OutboxEntry>()
+            .Where(e => e.PublishedAt == null && e.AttemptCount < _options.MaxAttempts)
             .OrderBy(e => e.CreatedAt)
             .Take(_options.BatchSize)
-            .ToList();
+            .ToListAsync(ct);
 
         if (pending.Count == 0)
         {
@@ -141,16 +143,39 @@ public sealed class OutboxDispatcher : BackgroundService
             {
                 entry.AttemptCount++;
                 entry.LastAttemptAt = DateTimeOffset.UtcNow;
-                entry.LastError = ex.Message;
-                _logger.LogWarning(ex,
-                    "Outbox entry {EntryId} publish failed (attempt {Attempt})",
-                    entry.Id, entry.AttemptCount);
+
+                // LastError is capped at 2000 chars in the model; an
+                // over-long exception message would otherwise fail the
+                // SaveChanges below on Postgres, losing the whole batch's
+                // progress along with it.
+                entry.LastError = Truncate(ex.Message, MaxLastErrorLength);
+
+                if (entry.AttemptCount >= _options.MaxAttempts)
+                {
+                    _logger.LogError(ex,
+                        "[OUTBOX-DEAD-LETTER] Outbox entry {EntryId} on {Subject} failed {Attempt} times and "
+                        + "will no longer be retried. It remains in the Outbox table; reset AttemptCount to 0 "
+                        + "to requeue it once the cause is fixed.",
+                        entry.Id, entry.Subject, entry.AttemptCount);
+                }
+                else
+                {
+                    _logger.LogWarning(ex,
+                        "Outbox entry {EntryId} publish failed (attempt {Attempt} of {Max})",
+                        entry.Id, entry.AttemptCount, _options.MaxAttempts);
+                }
             }
         }
 
         await db.SaveChangesAsync(ct);
         return eligible.Count;
     }
+
+    // Matches the HasMaxLength(2000) on OutboxEntry.LastError.
+    private const int MaxLastErrorLength = 2000;
+
+    private static string Truncate(string value, int maxLength) =>
+        value.Length <= maxLength ? value : value[..maxLength];
 
     private bool IsEligible(OutboxEntry entry, DateTimeOffset now)
     {

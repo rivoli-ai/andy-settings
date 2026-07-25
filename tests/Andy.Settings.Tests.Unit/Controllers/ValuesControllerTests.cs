@@ -1,5 +1,6 @@
 using Andy.Settings.Api.Controllers;
 using Andy.Settings.Application.DTOs.Values;
+using Andy.Settings.Application.Exceptions;
 using Andy.Settings.Application.Interfaces;
 using Andy.Settings.Domain.Enums;
 using FluentAssertions;
@@ -85,7 +86,7 @@ public class ValuesControllerTests
             Etag = "stale-etag"
         };
         _assignmentMock.Setup(s => s.SetAsync(setDto, "test-user", It.IsAny<CancellationToken>()))
-            .ThrowsAsync(new InvalidOperationException("etag mismatch"));
+            .ThrowsAsync(new ConcurrencyConflictException("Concurrency conflict: etag mismatch."));
 
         var result = await _sut.Set(setDto, CancellationToken.None);
 

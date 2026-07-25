@@ -1,4 +1,5 @@
 using Andy.Settings.Application.DTOs.Common;
+using Andy.Settings.Application.Exceptions;
 using Andy.Settings.Application.DTOs.Values;
 using Andy.Settings.Application.Interfaces;
 using Andy.Settings.Application.Messaging.Events;
@@ -48,7 +49,7 @@ public class AssignmentRepository : IAssignmentService
         if (existing is not null)
         {
             if (dto.Etag is not null && dto.Etag != existing.Etag)
-                throw new InvalidOperationException("Concurrency conflict: etag mismatch.");
+                throw new ConcurrencyConflictException("Concurrency conflict: etag mismatch.");
 
             var beforeJson = existing.ValueJson;
             existing.ValueJson = dto.ValueJson;

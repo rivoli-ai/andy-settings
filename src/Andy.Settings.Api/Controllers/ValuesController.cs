@@ -1,5 +1,6 @@
 using Andy.Settings.Application.DTOs.Common;
 using Andy.Settings.Application.DTOs.Values;
+using Andy.Settings.Application.Exceptions;
 using Andy.Settings.Application.Interfaces;
 using Andy.Settings.Domain.Enums;
 using Andy.Rbac.Authorization;
@@ -53,7 +54,7 @@ public class ValuesController : ControllerBase
         {
             return NotFound();
         }
-        catch (InvalidOperationException ex) when (ex.Message.Contains("etag"))
+        catch (ConcurrencyConflictException ex)
         {
             return Conflict(new { error = ex.Message });
         }
