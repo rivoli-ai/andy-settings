@@ -20,6 +20,17 @@ public enum AuditEventType
     /// <summary>An encrypted secret was rotated.</summary>
     SecretRotated,
 
+    /// <summary>
+    /// An encrypted secret was decrypted and returned to a caller. Recorded
+    /// with the definition key, scope, and actor — never the value or any
+    /// digest of it, which would let an attacker with audit access confirm a
+    /// guessed secret.
+    /// </summary>
+    SecretRead,
+
+    /// <summary>All secrets for a definition were deleted.</summary>
+    SecretDeleted,
+
     /// <summary>Settings were imported from an external source.</summary>
     Imported,
 

@@ -22,6 +22,7 @@ public class SettingsMcpTools
     private readonly IAuditService _audit;
     private readonly IExportImportService _exportImport;
     private readonly ISecretService _secrets;
+    private readonly ICurrentUserService _currentUser;
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -37,7 +38,8 @@ public class SettingsMcpTools
         IAssignmentService assignments,
         IAuditService audit,
         IExportImportService exportImport,
-        ISecretService secrets)
+        ISecretService secrets,
+        ICurrentUserService currentUser)
     {
         _definitions = definitions;
         _resolution = resolution;
@@ -45,7 +47,15 @@ public class SettingsMcpTools
         _audit = audit;
         _exportImport = exportImport;
         _secrets = secrets;
+        _currentUser = currentUser;
     }
+
+    // Identity of the caller behind this MCP tool invocation. The /mcp endpoint
+    // requires authorization, so a token is present and its subject is the
+    // actor. Every write used to hard-code a null actor, which meant
+    // agent-driven changes — the ones most in need of attribution — were the
+    // only ones recorded as coming from nobody (rivoli-ai/andy-settings#131).
+    private string? ActorId => _currentUser.GetUserId();
 
     [McpServerTool(Name = "settings_list_definitions")]
     [RequirePermission("definition:read")]
@@ -107,7 +117,7 @@ public class SettingsMcpTools
             ScopeId = scopeId,
             ValueJson = valueJson,
         };
-        var result = await _assignments.SetAsync(dto, actorId: null);
+        var result = await _assignments.SetAsync(dto, ActorId);
         return JsonSerializer.Serialize(result, JsonOptions);
     }
 
@@ -128,7 +138,7 @@ public class SettingsMcpTools
             return JsonSerializer.Serialize(new { error = "No assignment found matching the specified definition key, scope type, and scope ID." }, JsonOptions);
 
         var assignment = assignments.Items[0];
-        await _assignments.DeleteAsync(assignment.Id, actorId: null);
+        await _assignments.DeleteAsync(assignment.Id, ActorId);
         return JsonSerializer.Serialize(new { success = true, message = $"Deleted assignment for '{definitionKey}' at scope {scopeType}/{scopeId ?? "(global)"}." }, JsonOptions);
     }
 
@@ -366,7 +376,7 @@ public class SettingsMcpTools
                 ScopeId = scopeId,
                 PlaintextValue = value,
             };
-            var result = await _secrets.SetSecretAsync(dto, actorId: null);
+            var result = await _secrets.SetSecretAsync(dto, ActorId);
             return JsonSerializer.Serialize(result, JsonOptions);
         }
         catch (Exception ex)
@@ -398,7 +408,7 @@ public class SettingsMcpTools
                 ScopeType = parsedScope,
                 ScopeId = scopeId,
             };
-            var result = await _secrets.GetSecretAsync(dto);
+            var result = await _secrets.GetSecretAsync(dto, ActorId);
             if (result is null)
                 return JsonSerializer.Serialize(new { error = $"No secret found for definition '{definitionKey}' at scope {scopeType ?? "Machine"}/{scopeId ?? "(none)"}." }, JsonOptions);
 
@@ -431,7 +441,7 @@ public class SettingsMcpTools
                 ScopeId = scopeId,
                 NewPlaintextValue = newValue,
             };
-            var result = await _secrets.RotateSecretAsync(dto, actorId: null);
+            var result = await _secrets.RotateSecretAsync(dto, ActorId);
             return JsonSerializer.Serialize(result, JsonOptions);
         }
         catch (Exception ex)
@@ -447,7 +457,7 @@ public class SettingsMcpTools
     {
         try
         {
-            await _secrets.DeleteSecretAsync(definitionKey);
+            await _secrets.DeleteSecretAsync(definitionKey, ActorId);
             return JsonSerializer.Serialize(new { success = true, message = $"Secret for definition '{definitionKey}' deleted." }, JsonOptions);
         }
         catch (Exception ex)
@@ -492,7 +502,7 @@ public class SettingsMcpTools
         {
             using var stream = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(jsonData));
             var options = new ImportOptions();
-            var result = await _exportImport.ImportAsync(stream, options, null);
+            var result = await _exportImport.ImportAsync(stream, options, ActorId);
             return JsonSerializer.Serialize(result, JsonOptions);
         }
         catch (Exception ex)

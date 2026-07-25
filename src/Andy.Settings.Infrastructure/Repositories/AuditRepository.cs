@@ -18,36 +18,41 @@ public class AuditRepository : IAuditService
 
     public async Task<PagedResult<AuditEventDto>> QueryAsync(AuditQuery query, CancellationToken ct = default)
     {
-        var q = _db.AuditEvents.AsQueryable();
+        // Every filter, the sort, and the paging run server-side.
+        //
+        // This used to materialize the whole table and finish the work in
+        // LINQ-to-Objects, on the grounds that "SQLite has limited support for
+        // DateTimeOffset and enum conversions". Both premises are obsolete:
+        // SettingsDbContext.ConfigureConventions binds DateTimeOffsetToBinaryConverter
+        // for SQLite precisely so these predicates translate, and EventType is
+        // configured with HasConversion<string>(). The audit table is append-only
+        // with no retention job, so the in-memory path degraded without bound
+        // (rivoli-ai/andy-settings#133).
+        var q = _db.AuditEvents.AsNoTracking();
 
-        // SQLite has limited support for DateTimeOffset and enum conversions.
-        // Apply simple string filters in SQL, then do date/enum filters + sort in memory.
         if (!string.IsNullOrEmpty(query.DefinitionKey))
             q = q.Where(e => e.DefinitionKey == query.DefinitionKey);
         if (!string.IsNullOrEmpty(query.ActorId))
             q = q.Where(e => e.ActorId == query.ActorId);
-
-        var filtered = await q.AsNoTracking().ToListAsync(ct);
-
         if (query.EventType.HasValue)
-            filtered = filtered.Where(e => e.EventType == query.EventType.Value).ToList();
-
-        // Apply date filters in memory (if provided)
+            q = q.Where(e => e.EventType == query.EventType.Value);
         if (query.DateFrom.HasValue)
-            filtered = filtered.Where(e => e.CreatedAt >= query.DateFrom.Value).ToList();
+            q = q.Where(e => e.CreatedAt >= query.DateFrom.Value);
         if (query.DateTo.HasValue)
-            filtered = filtered.Where(e => e.CreatedAt <= query.DateTo.Value).ToList();
+            q = q.Where(e => e.CreatedAt <= query.DateTo.Value);
 
-        var totalCount = filtered.Count;
-        var items = filtered
+        var (page, pageSize) = Paging.Normalize(query.Page, query.PageSize);
+
+        var totalCount = await q.CountAsync(ct);
+        var items = await q
             .OrderByDescending(e => e.CreatedAt)
-            .Skip((query.Page - 1) * query.PageSize)
-            .Take(query.PageSize)
-            .ToList();
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(ct);
 
         return new PagedResult<AuditEventDto>(
             items.Select(ToDto).ToList(),
-            totalCount, query.Page, query.PageSize);
+            totalCount, page, pageSize);
     }
 
     public async Task<AuditEventDto?> GetByIdAsync(Guid id, CancellationToken ct = default)

@@ -48,19 +48,21 @@ public class DefinitionRepository : IDefinitionService
             q = q.Where(d => d.TagsJson != null && d.TagsJson.ToLower().Contains(tag));
         }
 
+        var (page, pageSize) = Paging.Normalize(query.Page, query.PageSize);
+
         var totalCount = await q.CountAsync(ct);
 
         var items = await q
             .OrderBy(d => d.ApplicationCode).ThenBy(d => d.Key)
-            .Skip((query.Page - 1) * query.PageSize)
-            .Take(query.PageSize)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
             .ToListAsync(ct);
 
         return new PagedResult<DefinitionDto>(
             items.Select(ToDto).ToList(),
             totalCount,
-            query.Page,
-            query.PageSize);
+            page,
+            pageSize);
     }
 
     public async Task<DefinitionDto> CreateAsync(CreateDefinitionDto dto, CancellationToken ct = default)

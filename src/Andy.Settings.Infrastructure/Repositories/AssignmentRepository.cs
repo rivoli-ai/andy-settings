@@ -130,6 +130,8 @@ public class AssignmentRepository : IAssignmentService
         if (!string.IsNullOrEmpty(scopeId))
             q = q.Where(a => a.ScopeId == scopeId);
 
+        (page, pageSize) = Paging.Normalize(page, pageSize);
+
         var totalCount = await q.CountAsync(ct);
         var items = await q
             .OrderBy(a => a.Definition.Key).ThenBy(a => a.ScopeType)

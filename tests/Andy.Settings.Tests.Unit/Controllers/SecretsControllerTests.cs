@@ -74,7 +74,7 @@ public class SecretsControllerTests
     [Fact]
     public async Task GetSecret_Returns200WithValue()
     {
-        _secretMock.Setup(s => s.GetSecretAsync(It.IsAny<GetSecretDto>(), It.IsAny<CancellationToken>()))
+        _secretMock.Setup(s => s.GetSecretAsync(It.IsAny<GetSecretDto>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync("decrypted-value");
 
         var result = await _sut.GetSecret("app.secret.key", ScopeType.Machine, null, CancellationToken.None);
@@ -89,7 +89,7 @@ public class SecretsControllerTests
     [Fact]
     public async Task GetSecret_Returns404WhenNotFound()
     {
-        _secretMock.Setup(s => s.GetSecretAsync(It.IsAny<GetSecretDto>(), It.IsAny<CancellationToken>()))
+        _secretMock.Setup(s => s.GetSecretAsync(It.IsAny<GetSecretDto>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((string?)null);
 
         var result = await _sut.GetSecret("app.secret.key", ScopeType.Machine, null, CancellationToken.None);
@@ -127,7 +127,7 @@ public class SecretsControllerTests
     [Fact]
     public async Task DeleteSecret_Returns204()
     {
-        _secretMock.Setup(s => s.DeleteSecretAsync("app.secret.key", It.IsAny<CancellationToken>()))
+        _secretMock.Setup(s => s.DeleteSecretAsync("app.secret.key", It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
         var result = await _sut.DeleteSecret("app.secret.key", CancellationToken.None);
@@ -138,7 +138,7 @@ public class SecretsControllerTests
     [Fact]
     public async Task DeleteSecret_Returns404WhenNotFound()
     {
-        _secretMock.Setup(s => s.DeleteSecretAsync("missing.key", It.IsAny<CancellationToken>()))
+        _secretMock.Setup(s => s.DeleteSecretAsync("missing.key", It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new KeyNotFoundException("Definition not found"));
 
         var result = await _sut.DeleteSecret("missing.key", CancellationToken.None);

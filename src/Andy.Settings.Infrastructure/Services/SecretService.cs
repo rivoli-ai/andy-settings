@@ -100,7 +100,7 @@ public class SecretService : ISecretService
         return ToMetadataDto(existing, dto.DefinitionKey);
     }
 
-    public async Task<string?> GetSecretAsync(GetSecretDto dto, CancellationToken ct = default)
+    public async Task<string?> GetSecretAsync(GetSecretDto dto, string? actorId = null, CancellationToken ct = default)
     {
         var definition = await _db.SettingDefinitions.FirstOrDefaultAsync(d => d.Key == dto.DefinitionKey, ct)
             ?? throw new KeyNotFoundException($"Definition '{dto.DefinitionKey}' not found.");
@@ -116,7 +116,20 @@ public class SecretService : ISecretService
 
         try
         {
-            return _protector.Unprotect(secret.EncryptedValue);
+            var plaintext = _protector.Unprotect(secret.EncryptedValue);
+
+            // Decrypting a secret is the most security-relevant thing this
+            // service does and used to leave no trace at all
+            // (rivoli-ai/andy-settings#132). BeforeJson/AfterJson stay null —
+            // the audit trail records THAT a secret was read, by whom, at which
+            // scope; never the value or a digest of it, which would let anyone
+            // with audit access confirm a guess.
+            await _audit.RecordAsync(new AuditEventDto(
+                Guid.NewGuid(), AuditEventType.SecretRead, dto.DefinitionKey,
+                dto.ScopeType, dto.ScopeId, "User", actorId,
+                null, null, null, DateTimeOffset.UtcNow), ct);
+
+            return plaintext;
         }
         catch (CryptographicException ex)
         {
@@ -151,7 +164,7 @@ public class SecretService : ISecretService
         }, actorId, ct);
     }
 
-    public async Task DeleteSecretAsync(string definitionKey, CancellationToken ct = default)
+    public async Task DeleteSecretAsync(string definitionKey, string? actorId = null, CancellationToken ct = default)
     {
         var definition = await _db.SettingDefinitions.FirstOrDefaultAsync(d => d.Key == definitionKey, ct)
             ?? throw new KeyNotFoundException($"Definition '{definitionKey}' not found.");
@@ -179,6 +192,15 @@ public class SecretService : ISecretService
             kind: SecretEventKind.Deleted);
 
         await _db.SaveChangesAsync(ct);
+
+        // The delete path published an event but recorded no audit row, so
+        // consumers learned about a secret deletion while the audit trail did
+        // not (rivoli-ai/andy-settings#132). ScopeId is null to match the
+        // event's "all scopes" semantics.
+        await _audit.RecordAsync(new AuditEventDto(
+            Guid.NewGuid(), AuditEventType.SecretDeleted, definitionKey,
+            ScopeType.Machine, null, "User", actorId,
+            null, null, null, DateTimeOffset.UtcNow), ct);
     }
 
     private static SecretMetadataDto ToMetadataDto(EncryptedSecret e, string definitionKey) => new(
