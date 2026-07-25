@@ -32,7 +32,7 @@ A **centralized configuration service**. Every other Andy service defines its tu
 
 - Typed schemas + JSON-schema validation
 - **Scope-precedence resolution** with source-chain explanation
-- **Encrypted secrets** (Data Protection API, AES-256-GCM)
+- **Encrypted secrets** (Data Protection API, AES-256-CBC + HMAC-SHA256)
 - **Append-only audit trail** of every change
 - Export / import for environment promotion
 - MCP tools for AI-driven configuration
@@ -232,7 +232,7 @@ No dedicated SDK yet — `Andy.Settings.Shared` is the shared contract.
 ## CLI
 
 ```bash
-andy-settings auth login                       # OAuth device flow
+export ANDY_SETTINGS_TOKEN=<token>            # auth (device flow not implemented)
 andy-settings definitions list --app containers
 andy-settings get andy.containers.defaultProvider --scope team --scope-id t1
 andy-settings explain andy.containers.defaultProvider --format json

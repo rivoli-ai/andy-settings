@@ -149,7 +149,7 @@ Using ASP.NET Core Data Protection API:
 - Support rotation (new encrypted value, old discarded)
 
 **Acceptance criteria:**
-- [ ] Values are AES-256-GCM encrypted
+- [ ] Values are AES-256-CBC + HMAC-SHA256 encrypted (ASP.NET Core Data Protection default)
 - [ ] Decryption requires authorization check
 - [ ] Rotation emits audit event without payload
 
@@ -340,7 +340,7 @@ Full middleware pipeline:
 
 ### Story 6.1: Auth commands
 
-- `andy-settings auth login` -- OAuth Device Flow
+- `andy-settings auth login` -- OAuth Device Flow (NOT IMPLEMENTED; use `ANDY_SETTINGS_TOKEN`)
 - `andy-settings auth logout` -- clear stored token
 
 ### Story 6.2: Definition commands

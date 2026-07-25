@@ -44,6 +44,7 @@ public static class ExportImportCommands
                 if (!response.IsSuccessStatusCode)
                 {
                     Console.Error.WriteLine($"Error {(int)response.StatusCode}: {body}");
+                    ctx.ExitCode = 1;
                     return;
                 }
 
@@ -60,6 +61,7 @@ public static class ExportImportCommands
             catch (HttpRequestException ex)
             {
                 Console.Error.WriteLine($"Connection error: {ex.Message}");
+                ctx.ExitCode = 1;
             }
         });
 
@@ -84,6 +86,7 @@ public static class ExportImportCommands
             if (!File.Exists(file))
             {
                 Console.Error.WriteLine($"File not found: {file}");
+                ctx.ExitCode = 1;
                 return;
             }
 
@@ -101,6 +104,7 @@ public static class ExportImportCommands
                 if (!response.IsSuccessStatusCode)
                 {
                     Console.Error.WriteLine($"Error {(int)response.StatusCode}: {body}");
+                    ctx.ExitCode = 1;
                     return;
                 }
 
@@ -141,6 +145,7 @@ public static class ExportImportCommands
             catch (HttpRequestException ex)
             {
                 Console.Error.WriteLine($"Connection error: {ex.Message}");
+                ctx.ExitCode = 1;
             }
         });
 

@@ -43,7 +43,7 @@ public static class DefinitionCommands
 
             var url = "api/definitions?" + string.Join("&", queryParams);
 
-            await FetchAndDisplayDefinitions(apiUrl, url, format);
+            if (!await FetchAndDisplayDefinitions(apiUrl, url, format)) ctx.ExitCode = 1;
         });
 
         // --- definitions search ---
@@ -59,7 +59,7 @@ public static class DefinitionCommands
 
             var url = $"api/definitions?search={Uri.EscapeDataString(query)}";
 
-            await FetchAndDisplayDefinitions(apiUrl, url, format);
+            if (!await FetchAndDisplayDefinitions(apiUrl, url, format)) ctx.ExitCode = 1;
         });
 
         // --- definitions get ---
@@ -83,6 +83,7 @@ public static class DefinitionCommands
                 if (!response.IsSuccessStatusCode)
                 {
                     Console.Error.WriteLine($"Error {(int)response.StatusCode}: {body}");
+                    ctx.ExitCode = 1;
                     return;
                 }
 
@@ -103,6 +104,7 @@ public static class DefinitionCommands
             catch (HttpRequestException ex)
             {
                 Console.Error.WriteLine($"Connection error: {ex.Message}");
+                ctx.ExitCode = 1;
             }
         });
 
@@ -158,6 +160,7 @@ public static class DefinitionCommands
                 if (!response.IsSuccessStatusCode)
                 {
                     Console.Error.WriteLine($"Error {(int)response.StatusCode}: {body}");
+                    ctx.ExitCode = 1;
                     return;
                 }
 
@@ -166,6 +169,7 @@ public static class DefinitionCommands
             catch (HttpRequestException ex)
             {
                 Console.Error.WriteLine($"Connection error: {ex.Message}");
+                ctx.ExitCode = 1;
             }
         });
 
@@ -210,6 +214,7 @@ public static class DefinitionCommands
                 if (!response.IsSuccessStatusCode)
                 {
                     Console.Error.WriteLine($"Error {(int)response.StatusCode}: {body}");
+                    ctx.ExitCode = 1;
                     return;
                 }
 
@@ -218,6 +223,7 @@ public static class DefinitionCommands
             catch (HttpRequestException ex)
             {
                 Console.Error.WriteLine($"Connection error: {ex.Message}");
+                ctx.ExitCode = 1;
             }
         });
 
@@ -241,6 +247,7 @@ public static class DefinitionCommands
                 if (!response.IsSuccessStatusCode)
                 {
                     Console.Error.WriteLine($"Error {(int)response.StatusCode}: {body}");
+                    ctx.ExitCode = 1;
                     return;
                 }
 
@@ -249,6 +256,7 @@ public static class DefinitionCommands
             catch (HttpRequestException ex)
             {
                 Console.Error.WriteLine($"Connection error: {ex.Message}");
+                ctx.ExitCode = 1;
             }
         });
 
@@ -262,7 +270,7 @@ public static class DefinitionCommands
         return definitionsCommand;
     }
 
-    private static async Task FetchAndDisplayDefinitions(string apiUrl, string url, string format)
+    private static async Task<bool> FetchAndDisplayDefinitions(string apiUrl, string url, string format)
     {
         using var client = HttpClientFactory.Create(apiUrl);
 
@@ -274,13 +282,13 @@ public static class DefinitionCommands
             if (!response.IsSuccessStatusCode)
             {
                 Console.Error.WriteLine($"Error {(int)response.StatusCode}: {body}");
-                return;
+                return false;
             }
 
             if (format == "json")
             {
                 Console.WriteLine(body);
-                return;
+                return true;
             }
 
             using var doc = JsonDocument.Parse(body);
@@ -315,6 +323,9 @@ public static class DefinitionCommands
         catch (HttpRequestException ex)
         {
             Console.Error.WriteLine($"Connection error: {ex.Message}");
+            return false;
         }
+
+        return true;
     }
 }

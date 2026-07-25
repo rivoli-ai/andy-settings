@@ -30,7 +30,7 @@ Andy Settings uses Andy Auth for OAuth 2.0 / OIDC authentication.
 Supported client types:
 
 - Browser SPA (Angular, PKCE)
-- CLI public client (Device Flow)
+- CLI public client (Device Flow) — PLANNED, not implemented; the CLI currently takes a bearer token from `ANDY_SETTINGS_TOKEN`
 - Backend confidential client (service-to-service)
 - Conductor (tokens forwarded via UnifiedProxy)
 
@@ -90,7 +90,7 @@ Authorization is enforced in the application service layer, not just controllers
 
 ### Encryption Strategy
 
-Secrets are encrypted using ASP.NET Core Data Protection API (AES-256-GCM):
+Secrets are encrypted using ASP.NET Core Data Protection API (AES-256-CBC for confidentiality, HMAC-SHA256 for authentication — the framework default):
 
 - Setting definitions marked with `is_secret = true`
 - Secret values are encrypted before storage in the `encrypted_secrets` table

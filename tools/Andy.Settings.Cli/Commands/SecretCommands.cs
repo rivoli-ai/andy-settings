@@ -1,4 +1,5 @@
 using System.CommandLine;
+using Andy.Settings.Cli;
 using System.CommandLine.Invocation;
 using System.Net.Http;
 using System.Text;
@@ -15,7 +16,13 @@ public static class SecretCommands
         // --- secrets set ---
         var setCommand = new Command("set", "Set a secret value");
         var setKeyArg = new Argument<string>("key", "The secret key");
-        var setValueArg = new Argument<string>("value", "The secret value");
+        // Optional. Passing a secret on the command line puts it in shell
+        // history and in `ps` output for the lifetime of the process, readable
+        // by any local user (rivoli-ai/andy-settings#141). Omit it and the
+        // value is read from stdin, or prompted for without echo.
+        var setValueArg = new Argument<string?>("value",
+            () => null,
+            "The secret value. Omit to read from stdin, or to be prompted without echo.");
         var setScopeOption = new Option<string?>("--scope", "Scope (e.g. Machine, User, Team)");
         var setScopeIdOption = new Option<string?>("--scope-id", "Scope identifier");
 
@@ -28,7 +35,15 @@ public static class SecretCommands
         {
             var apiUrl = ctx.ParseResult.GetValueForOption(apiUrlOption)!;
             var key = ctx.ParseResult.GetValueForArgument(setKeyArg);
-            var value = ctx.ParseResult.GetValueForArgument(setValueArg);
+            var value = SecretInput.Resolve(
+                ctx.ParseResult.GetValueForArgument(setValueArg),
+                "Secret value: ");
+            if (value is null)
+            {
+                Console.Error.WriteLine("No secret value provided.");
+                ctx.ExitCode = 1;
+                return;
+            }
             var scope = ctx.ParseResult.GetValueForOption(setScopeOption);
             var scopeId = ctx.ParseResult.GetValueForOption(setScopeIdOption);
 
@@ -48,6 +63,7 @@ public static class SecretCommands
                 if (!response.IsSuccessStatusCode)
                 {
                     Console.Error.WriteLine($"Error {(int)response.StatusCode}: {body}");
+                    ctx.ExitCode = 1;
                     return;
                 }
 
@@ -56,6 +72,7 @@ public static class SecretCommands
             catch (HttpRequestException ex)
             {
                 Console.Error.WriteLine($"Connection error: {ex.Message}");
+                ctx.ExitCode = 1;
             }
         });
 
@@ -93,6 +110,7 @@ public static class SecretCommands
                 if (!response.IsSuccessStatusCode)
                 {
                     Console.Error.WriteLine($"Error {(int)response.StatusCode}: {body}");
+                    ctx.ExitCode = 1;
                     return;
                 }
 
@@ -101,13 +119,16 @@ public static class SecretCommands
             catch (HttpRequestException ex)
             {
                 Console.Error.WriteLine($"Connection error: {ex.Message}");
+                ctx.ExitCode = 1;
             }
         });
 
         // --- secrets rotate ---
         var rotateCommand = new Command("rotate", "Rotate a secret value");
         var rotateKeyArg = new Argument<string>("key", "The secret key");
-        var rotateValueArg = new Argument<string>("new-value", "The new secret value");
+        var rotateValueArg = new Argument<string?>("new-value",
+            () => null,
+            "The new secret value. Omit to read from stdin, or to be prompted without echo.");
         var rotateScopeOption = new Option<string?>("--scope", "Scope (e.g. Machine, User, Team)");
         var rotateScopeIdOption = new Option<string?>("--scope-id", "Scope identifier");
 
@@ -120,13 +141,24 @@ public static class SecretCommands
         {
             var apiUrl = ctx.ParseResult.GetValueForOption(apiUrlOption)!;
             var key = ctx.ParseResult.GetValueForArgument(rotateKeyArg);
-            var newValue = ctx.ParseResult.GetValueForArgument(rotateValueArg);
+            var newValue = SecretInput.Resolve(
+                ctx.ParseResult.GetValueForArgument(rotateValueArg),
+                "New secret value: ");
+            if (newValue is null)
+            {
+                Console.Error.WriteLine("No secret value provided.");
+                ctx.ExitCode = 1;
+                return;
+            }
             var scope = ctx.ParseResult.GetValueForOption(rotateScopeOption);
             var scopeId = ctx.ParseResult.GetValueForOption(rotateScopeIdOption);
 
             using var client = HttpClientFactory.Create(apiUrl);
 
-            var payload = new Dictionary<string, object?> { ["value"] = newValue };
+            // The rotate endpoint binds RotateSecretBody, whose property is
+            // `newValue` — not `value`. Sending `value` left NewValue null on
+            // the server, so `secrets rotate` never worked.
+            var payload = new Dictionary<string, object?> { ["newValue"] = newValue };
             if (!string.IsNullOrEmpty(scope)) payload["scopeType"] = scope;
             if (!string.IsNullOrEmpty(scopeId)) payload["scopeId"] = scopeId;
 
@@ -140,6 +172,7 @@ public static class SecretCommands
                 if (!response.IsSuccessStatusCode)
                 {
                     Console.Error.WriteLine($"Error {(int)response.StatusCode}: {body}");
+                    ctx.ExitCode = 1;
                     return;
                 }
 
@@ -148,6 +181,7 @@ public static class SecretCommands
             catch (HttpRequestException ex)
             {
                 Console.Error.WriteLine($"Connection error: {ex.Message}");
+                ctx.ExitCode = 1;
             }
         });
 
@@ -171,6 +205,7 @@ public static class SecretCommands
                 if (!response.IsSuccessStatusCode)
                 {
                     Console.Error.WriteLine($"Error {(int)response.StatusCode}: {body}");
+                    ctx.ExitCode = 1;
                     return;
                 }
 
@@ -179,6 +214,7 @@ public static class SecretCommands
             catch (HttpRequestException ex)
             {
                 Console.Error.WriteLine($"Connection error: {ex.Message}");
+                ctx.ExitCode = 1;
             }
         });
 

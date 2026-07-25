@@ -21,7 +21,7 @@ export class ApiService {
   }
 
   getDefinition(key: string): Observable<any> {
-    return this.http.get(`${this.baseUrl}/definitions/${key}`);
+    return this.http.get(`${this.baseUrl}/definitions/${encodeURIComponent(key)}`);
   }
 
   createDefinition(dto: any): Observable<any> {
@@ -29,19 +29,30 @@ export class ApiService {
   }
 
   updateDefinition(key: string, dto: any): Observable<any> {
-    return this.http.put(`${this.baseUrl}/definitions/${key}`, dto);
+    return this.http.put(`${this.baseUrl}/definitions/${encodeURIComponent(key)}`, dto);
   }
 
   deleteDefinition(key: string): Observable<any> {
-    return this.http.delete(`${this.baseUrl}/definitions/${key}`);
+    return this.http.delete(`${this.baseUrl}/definitions/${encodeURIComponent(key)}`);
   }
 
   // Values
-  getValues(params?: { definitionKey?: string; scopeType?: string; scopeId?: string }): Observable<any> {
+  // page/pageSize are forwarded so the values view can page. Without them the
+  // API applies its default of 25 and the screen silently showed only the
+  // first page, with no control and no indication more existed.
+  getValues(params?: {
+    definitionKey?: string;
+    scopeType?: string;
+    scopeId?: string;
+    page?: number;
+    pageSize?: number;
+  }): Observable<any> {
     let httpParams = new HttpParams();
     if (params?.definitionKey) httpParams = httpParams.set('definitionKey', params.definitionKey);
     if (params?.scopeType) httpParams = httpParams.set('scopeType', params.scopeType);
     if (params?.scopeId) httpParams = httpParams.set('scopeId', params.scopeId);
+    if (params?.page) httpParams = httpParams.set('page', params.page.toString());
+    if (params?.pageSize) httpParams = httpParams.set('pageSize', params.pageSize.toString());
     return this.http.get(`${this.baseUrl}/values`, { params: httpParams });
   }
 
@@ -50,7 +61,7 @@ export class ApiService {
   }
 
   deleteValue(id: string): Observable<any> {
-    return this.http.delete(`${this.baseUrl}/values/${id}`);
+    return this.http.delete(`${this.baseUrl}/values/${encodeURIComponent(id)}`);
   }
 
   // Secrets are deliberately isolated from ordinary value endpoints.

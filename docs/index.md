@@ -11,13 +11,13 @@ Andy Settings provides typed setting definitions, scoped value assignments, encr
 | Feature | Description |
 |---------|-------------|
 | **Typed Definitions** | Strongly typed setting schemas with validation, defaults, and UI metadata |
-| **Scoped Resolution** | 8-level scope precedence with deterministic resolution and explanation |
-| **Encrypted Secrets** | AES-256-GCM encryption via Data Protection API, RBAC-gated access |
+| **Scoped Resolution** | 7-level scope precedence with deterministic resolution and explanation |
+| **Encrypted Secrets** | AES-256-CBC + HMAC-SHA256 encryption via Data Protection API, RBAC-gated access |
 | **Audit Trail** | Append-only change history with actor, scope, and diff metadata |
 | **Conductor Integration** | Embedded as 8th service in Conductor macOS app (port 9107) |
 | **REST + Swagger** | Full CRUD API with OpenAPI documentation |
 | **MCP Tools** | Model Context Protocol tools for AI assistant integration |
-| **CLI** | Command-line tool with table/JSON output and OAuth device flow |
+| **CLI** | Command-line tool with table/JSON output. Auth via `ANDY_SETTINGS_TOKEN`; OAuth device flow is not implemented |
 | **Angular Web UI** | Definitions browser, scope editor, secret management, audit views |
 | **Auth & RBAC** | Andy Auth (OIDC) + Andy RBAC with scope-aware permissions |
 | **Dual Database** | PostgreSQL (shared) or SQLite (embedded/Conductor) |

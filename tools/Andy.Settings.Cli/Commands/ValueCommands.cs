@@ -56,6 +56,7 @@ public static class ValueCommands
                 if (!response.IsSuccessStatusCode)
                 {
                     Console.Error.WriteLine($"Error {(int)response.StatusCode}: {body}");
+                    ctx.ExitCode = 1;
                     return;
                 }
 
@@ -80,6 +81,7 @@ public static class ValueCommands
             catch (HttpRequestException ex)
             {
                 Console.Error.WriteLine($"Connection error: {ex.Message}");
+                ctx.ExitCode = 1;
             }
         });
 
@@ -136,6 +138,7 @@ public static class ValueCommands
                 if (!response.IsSuccessStatusCode)
                 {
                     Console.Error.WriteLine($"Error {(int)response.StatusCode}: {body}");
+                    ctx.ExitCode = 1;
                     return;
                 }
 
@@ -144,6 +147,7 @@ public static class ValueCommands
             catch (HttpRequestException ex)
             {
                 Console.Error.WriteLine($"Connection error: {ex.Message}");
+                ctx.ExitCode = 1;
             }
         });
 
@@ -184,6 +188,7 @@ public static class ValueCommands
                 if (!lookupResponse.IsSuccessStatusCode)
                 {
                     Console.Error.WriteLine($"Error {(int)lookupResponse.StatusCode}: {lookupBody}");
+                    ctx.ExitCode = 1;
                     return;
                 }
 
@@ -206,6 +211,7 @@ public static class ValueCommands
                 if (string.IsNullOrEmpty(assignmentId))
                 {
                     Console.Error.WriteLine("No matching value assignment found.");
+                    ctx.ExitCode = 1;
                     return;
                 }
 
@@ -216,6 +222,7 @@ public static class ValueCommands
                 if (!deleteResponse.IsSuccessStatusCode)
                 {
                     Console.Error.WriteLine($"Error {(int)deleteResponse.StatusCode}: {deleteBody}");
+                    ctx.ExitCode = 1;
                     return;
                 }
 
@@ -224,6 +231,7 @@ public static class ValueCommands
             catch (HttpRequestException ex)
             {
                 Console.Error.WriteLine($"Connection error: {ex.Message}");
+                ctx.ExitCode = 1;
             }
         });
 
@@ -276,6 +284,7 @@ public static class ValueCommands
                 if (!response.IsSuccessStatusCode)
                 {
                     Console.Error.WriteLine($"Error {(int)response.StatusCode}: {body}");
+                    ctx.ExitCode = 1;
                     return;
                 }
 
@@ -312,6 +321,7 @@ public static class ValueCommands
             catch (HttpRequestException ex)
             {
                 Console.Error.WriteLine($"Connection error: {ex.Message}");
+                ctx.ExitCode = 1;
             }
         });
 
@@ -361,6 +371,7 @@ public static class ValueCommands
                 if (!response.IsSuccessStatusCode)
                 {
                     Console.Error.WriteLine($"Error {(int)response.StatusCode}: {body}");
+                    ctx.ExitCode = 1;
                     return;
                 }
 
@@ -413,6 +424,7 @@ public static class ValueCommands
             catch (HttpRequestException ex)
             {
                 Console.Error.WriteLine($"Connection error: {ex.Message}");
+                ctx.ExitCode = 1;
             }
         });
 
