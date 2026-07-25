@@ -50,3 +50,9 @@ dist/
 ## Test artifacts
 TestResults/
 *.trx
+
+## Agent tooling
+# Local Claude Code settings, and the git worktrees it creates under
+# .claude/worktrees/. Those are full checkouts — they reached 188 MB here — and
+# must never be committed.
+.claude/

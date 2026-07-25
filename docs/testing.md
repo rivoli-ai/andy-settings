@@ -35,14 +35,14 @@ Testing stack: xUnit 2.9.2, Moq 4.20.72, FluentAssertions 6.12.2, EF Core InMemo
 
 Primary targets:
 
-- EF Core persistence on SQLite (via `CustomWebApplicationFactory`)
+- EF Core persistence on SQLite and PostgreSQL (via `CustomWebApplicationFactory`)
 - API + database end-to-end flows
 - Auth and RBAC enforcement
 - MCP endpoint
 - Import/export round-trip with real database
 - Secret encryption with Data Protection
 
-Uses `WebApplicationFactory<Program>` with in-memory SQLite for fast, isolated tests.
+Uses `WebApplicationFactory<Program>` with in-memory SQLite for fast, isolated tests, or a real PostgreSQL server when `ANDY_SETTINGS_TEST_POSTGRES` is set (see Database Providers below).
 
 ### 3. Frontend Tests (`client/`)
 
@@ -122,8 +122,28 @@ Test all CRUD flows:
 
 ### Database Providers
 
-- SQLite: migrations apply, CRUD works, resolution queries correct
-- PostgreSQL: same test suite runs against real Postgres (CI with ephemeral container)
+Both shipped providers are tested, because several defects found in the 2026-07
+audit were provider-divergent and a SQLite-only suite could not see them — most
+sharply a negative SQL `OFFSET`, which SQLite clamps (silently serving page 1)
+and PostgreSQL rejects with a 500 (rivoli-ai/andy-settings#148).
+
+- **SQLite** (default): migrations apply, CRUD works, resolution queries correct.
+  No setup required — this is what `dotnet test` runs.
+- **PostgreSQL**: the same integration suite, against a real server. CI runs it
+  as a second step using an ephemeral `postgres:16-alpine` service container.
+
+To run the PostgreSQL pass locally, point the suite at any server:
+
+```bash
+docker run -d --name pg-test -e POSTGRES_PASSWORD=test -e POSTGRES_USER=test \
+  -e POSTGRES_DB=andy_settings_test -p 55432:5432 postgres:16-alpine
+
+ANDY_SETTINGS_TEST_POSTGRES="Host=localhost;Port=55432;Database=andy_settings_test;Username=test;Password=test" \
+  dotnet test tests/Andy.Settings.Tests.Integration
+```
+
+Each factory instance creates and drops its own schema, so xUnit's parallel
+class execution can share one server safely.
 
 ## CLI Tests
 
@@ -158,5 +178,7 @@ For each tool:
 
 1. **Fast** -- build, lint, unit tests
 2. **Integration** -- SQLite integration tests, API tests, CLI tests
-3. **UI** -- Angular unit tests, Angular build
-4. **Smoke** -- Docker build, Compose startup, health checks
+3. **Integration (PostgreSQL)** -- the same integration suite against an
+   ephemeral `postgres:16-alpine` service container
+4. **UI** -- Angular unit tests, Angular build
+5. **Smoke** -- Docker build, Compose startup, health checks

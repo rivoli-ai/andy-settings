@@ -39,6 +39,26 @@ Per ADR 0001 AK5, `NatsStreamProvisioner` runs idempotently on every
 boot — andy-settings will not corrupt a stream provisioned by another
 service.
 
+`ANDY_DOMAIN` is **shared**: andy-tasks, andy-issues, andy-agents and andy-rbac
+all carry subjects on it. Because `StreamConfig.Subjects` is a stream's
+*complete* subject list, provisioning **merges** — the provisioner reads the
+existing config, adds only the subjects this service is missing, and skips the
+write entirely when they are already covered. It refuses to start if a
+configured subject would subsume another service's.
+
+Coverage is computed with subject-pattern subsumption rather than string
+equality, because JetStream rejects *overlapping* subjects within one stream,
+not just duplicates: the shared stream's `andy.*.dlq.>` already covers this
+service's `andy.settings.dlq.>`, so adding the latter would have the whole
+update refused (rivoli-ai/andy-settings#149).
+
+!!! note "A stray stream claiming your subjects will wedge startup"
+
+    If another stream on the same server already owns `andy.settings.events.>`,
+    provisioning fails with `subjects overlap with an existing stream` — and the
+    error does not name the offending stream. Check `nats stream ls` before
+    assuming the config is wrong.
+
 ## Payload
 
 ```jsonc
@@ -140,10 +160,26 @@ operational pause is the right tool.
 - **DLQ subject.** `andy.settings.dlq.<original-subject>`. Always
   preserves the original headers; the payload is the raw bytes.
 - **Publish failure.** Outbox row stays pending. `AttemptCount`
-  increments, `LastError` records the exception. The dispatcher
-  exponentially backs off (`BackoffBase * 2^(n-1)`, capped at
-  `BackoffMax`) so a poison message does not spin the worker at full
-  speed.
+  increments, `LastError` records the exception (truncated to the
+  column's 2000 chars). The dispatcher exponentially backs off
+  (`BackoffBase * 2^(n-1)`, capped at `BackoffMax`) so a poison message
+  does not spin the worker at full speed.
+- **Dead letter.** After `Messaging:Outbox:MaxAttempts` failures
+  (default **12**, roughly an hour at the default backoff) the row stops
+  being considered for dispatch and is logged at error level with the
+  `[OUTBOX-DEAD-LETTER]` marker.
+
+    Without a terminal state a permanently-failing row stayed pending
+    forever, and once such rows exceeded the fetch window they filled
+    every batch — so **new events were never published at all** and config
+    changes silently stopped propagating
+    (rivoli-ai/andy-settings#139). The pending query is also ordered
+    server-side now, covered by the `(PublishedAt, CreatedAt)` index.
+
+    Dead-lettering is expressed through `AttemptCount` rather than a
+    separate column, so the row stays in the table — the outbox still
+    doubles as an audit log. **To requeue**, reset `AttemptCount` to 0
+    once the cause is fixed.
 
 ## Operational invariants
 

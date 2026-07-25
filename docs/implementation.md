@@ -125,7 +125,7 @@ POST   /api/definitions
 PUT    /api/definitions/{key}
 DELETE /api/definitions/{key}
 
-GET    /api/values?definitionKey={key}&scopeType={scope}&scopeId={id}
+GET    /api/values?definitionKey={key}&scopeType={scope}&scopeId={id}&page=&pageSize=
 POST   /api/values
 DELETE /api/values/{id}
 
@@ -146,6 +146,23 @@ GET    /api/export
 
 GET    /api/health
 ```
+
+### Pagination
+
+All list endpoints accept `page` (1-based) and `pageSize`. Both are clamped:
+`page` below 1 becomes 1, and `pageSize` is bounded to **1–500**, defaulting to
+25. `TotalCount` in the response always reports the true total, so a client can
+tell it needs to keep paging.
+
+The clamp exists because unvalidated input produced a negative SQL `OFFSET`,
+which SQLite silently clamps (serving page 1) while PostgreSQL rejects it with a
+500 — so the same request behaved differently in the Conductor-embedded and
+shared deployments (rivoli-ai/andy-settings#134).
+
+### Import limits
+
+`POST /api/import` and `/api/import/preview` buffer the whole document in memory
+and are capped at **16 MB**; a larger body returns 400.
 
 ## Implementation Phases
 

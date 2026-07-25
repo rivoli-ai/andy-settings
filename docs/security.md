@@ -34,6 +34,34 @@ Supported client types:
 - Backend confidential client (service-to-service)
 - Conductor (tokens forwarded via UnifiedProxy)
 
+### Auth bypass guard
+
+Two configuration switches disable access control entirely: an empty
+`AndyAuth:Authority` turns off authentication, and the `Development` environment
+registers a policy provider that satisfies **every** `[RequirePermission]` on
+every controller and MCP tool.
+
+Outside `Development`, the service now **refuses to start** when
+`AndyAuth:Authority` is empty, unless `ANDY_ALLOW_INSECURE_AUTH=true` makes
+running without authentication a deliberate act rather than an environment-name
+coincidence (rivoli-ai/andy-settings#144). Whenever either bypass is active, a
+warning is logged at startup.
+
+This mirrors the AK1 messaging guard, which fails the boot rather than silently
+degrading. Note that `docker-compose.yml` intentionally ships with both bypasses
+active — it is a local development stack, not a deployment template.
+
+### TLS in the CLI
+
+The CLI validates server certificates by default. The bypass requires an
+explicit `--insecure` flag or `ANDY_SETTINGS_INSECURE=true`, and warns on stderr
+when active. It was previously unconditional, which meant every invocation —
+carrying bearer tokens and plaintext secret values — accepted any certificate
+(rivoli-ai/andy-settings#129).
+
+Secret values may be passed on stdin or entered at a hidden prompt, so they need
+not appear in shell history or `ps` output.
+
 ### Embedded Bootstrap Mode
 
 For Conductor first-run when Andy Auth is not yet configured:
@@ -103,7 +131,24 @@ Secrets are encrypted using ASP.NET Core Data Protection API (AES-256-CBC for co
 - UI masks secrets by default; RBAC-gated reveal toggle
 - CLI avoids printing secret values unless explicitly requested and authorized
 - Exports mask secrets unless `--include-secrets` flag and `secret:read` permission
-- Audit captures secret access metadata without logging the payload
+- Every successful decrypt records a `SecretRead` audit event carrying the actor,
+  definition key and scope — and **never** the value or a digest of it. A digest
+  in the audit log would let anyone with audit-read access confirm a guessed
+  secret
+
+### Secret Deletion
+
+Deletion is **per-scope**. `DELETE /api/secrets/{key}` requires either a scope
+(`scopeType`, plus `scopeId` for non-Machine scopes) or an explicit
+`allScopes=true`; a request with neither is rejected with 400.
+
+This endpoint previously took no scope parameters and always deleted every
+scope, so clearing one user's credential also wiped the Machine-scope value and
+every other user's (rivoli-ai/andy-settings#138). The ambiguous request is
+rejected rather than quietly treated as a narrower delete, which would leave the
+caller believing a still-stored secret was gone.
+
+Every deletion records a `SecretDeleted` audit event.
 
 ### Secret Rotation
 
