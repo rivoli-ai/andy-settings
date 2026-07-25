@@ -16,6 +16,24 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
+    services:
+      # Backs the "Test integration suite against PostgreSQL" step below. Each
+      # test factory instance creates and drops its own schema, so parallel
+      # test classes share this one server safely.
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: andy_settings_test
+          POSTGRES_USER: andy_settings
+          POSTGRES_PASSWORD: andy_settings_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U andy_settings -d andy_settings_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
     - uses: actions/checkout@v4
       with:
@@ -32,8 +50,18 @@ jobs:
     - name: Build
       run: dotnet build --configuration Release --no-restore
 
-    - name: Test
+    - name: Test (SQLite — the Conductor-embedded provider)
       run: dotnet test --configuration Release --no-build --verbosity normal --collect:"XPlat Code Coverage"
+
+    # The suite ran against SQLite only, which hid every provider-divergent
+    # defect — most sharply rivoli-ai/andy-settings#134, where a negative SQL
+    # OFFSET is clamped by SQLite (silently serving page 1) but rejected by
+    # PostgreSQL (500), so the same request behaved differently in the embedded
+    # and shared deployments. Both providers ship, so both get tested (#148).
+    - name: Test integration suite against PostgreSQL
+      env:
+        ANDY_SETTINGS_TEST_POSTGRES: "Host=localhost;Port=5432;Database=andy_settings_test;Username=andy_settings;Password=andy_settings_ci"
+      run: dotnet test tests/Andy.Settings.Tests.Integration --configuration Release --no-build --verbosity normal
 
     - name: Pack client packages
       run: |

@@ -37,6 +37,28 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
         $"Data Source=file:integration-tests-{Guid.NewGuid():N}?Mode=Memory&Cache=Shared";
     private SqliteConnection? _keepAlive;
 
+    /// <summary>
+    /// Points the suite at a real PostgreSQL server. Unset (the default) runs
+    /// against in-memory SQLite.
+    /// </summary>
+    /// <remarks>
+    /// Several findings in the 2026-07 audit were provider-divergent and a
+    /// SQLite-only suite could not see them — most sharply #134, where a
+    /// negative SQL OFFSET is clamped by SQLite (silently serving page 1) and
+    /// rejected by PostgreSQL (500), so the same request behaved differently in
+    /// the Conductor-embedded and shared deployments. Running the suite against
+    /// both providers is what closes that blind spot
+    /// (rivoli-ai/andy-settings#148).
+    /// </remarks>
+    public const string PostgresConnectionEnvVar = "ANDY_SETTINGS_TEST_POSTGRES";
+
+    private static string? PostgresConnectionString =>
+        Environment.GetEnvironmentVariable(PostgresConnectionEnvVar) is { Length: > 0 } value ? value : null;
+
+    // Each factory instance needs its own schema so xUnit's parallel class
+    // execution cannot collide on a shared Postgres server.
+    private readonly string _postgresSchema = $"it_{Guid.NewGuid():N}";
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         // Development bypasses the AK1 fail-loud guard (in-memory bus is
@@ -59,7 +81,7 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
             {
                 ["AndyAuth:Authority"] = "",
                 ["Rbac:ApiBaseUrl"] = "",
-                ["Database:Provider"] = "Sqlite",
+                ["Database:Provider"] = PostgresConnectionString is null ? "Sqlite" : "PostgreSql",
                 ["OpenTelemetry:OtlpEndpoint"] = "",
                 ["ConnectionStrings:DefaultConnection"] = "",
                 ["Registrations:ManifestPaths:0"] = fixtureDir,
@@ -99,11 +121,42 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
                 .ToList();
             foreach (var d in descriptorsToRemove) services.Remove(d);
 
-            _keepAlive = new SqliteConnection(_connectionString);
-            _keepAlive.Open();
+            var postgres = PostgresConnectionString;
+            if (postgres is null)
+            {
+                _keepAlive = new SqliteConnection(_connectionString);
+                _keepAlive.Open();
 
-            services.AddDbContext<SettingsDbContext>(options =>
-                options.UseSqlite(_connectionString));
+                services.AddDbContext<SettingsDbContext>(options =>
+                    options.UseSqlite(_connectionString));
+            }
+            else
+            {
+                // Isolated schema per factory instance, so parallel test
+                // classes on one Postgres server cannot see each other's rows.
+                var builder = new Npgsql.NpgsqlConnectionStringBuilder(postgres)
+                {
+                    SearchPath = _postgresSchema,
+                };
+
+                using (var connection = new Npgsql.NpgsqlConnection(postgres))
+                {
+                    connection.Open();
+                    using var command = connection.CreateCommand();
+                    command.CommandText = $"CREATE SCHEMA IF NOT EXISTS \"{_postgresSchema}\";";
+                    command.ExecuteNonQuery();
+                }
+
+                services.AddDbContext<SettingsDbContext>(options =>
+                    options.UseNpgsql(builder.ConnectionString, npgsql =>
+                        // SearchPath alone is not enough: EF creates the
+                        // migrations-history table in the model's default
+                        // schema, which Npgsql qualifies as "public". Every
+                        // parallel factory then races to create the same
+                        // public.__EFMigrationsHistory and all but the first
+                        // fail with 42P07.
+                        npgsql.MigrationsHistoryTable("__EFMigrationsHistory", _postgresSchema)));
+            }
 
             // Bypass authentication: auto-succeed with a test user
             services.AddAuthentication("Test")
@@ -133,7 +186,28 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
     protected override void Dispose(bool disposing)
     {
         base.Dispose(disposing);
-        if (disposing) _keepAlive?.Dispose();
+        if (!disposing) return;
+
+        _keepAlive?.Dispose();
+
+        // Drop the per-instance schema so a long-lived CI Postgres does not
+        // accumulate one per test class per run.
+        if (PostgresConnectionString is { } postgres)
+        {
+            try
+            {
+                using var connection = new Npgsql.NpgsqlConnection(postgres);
+                connection.Open();
+                using var command = connection.CreateCommand();
+                command.CommandText = $"DROP SCHEMA IF EXISTS \"{_postgresSchema}\" CASCADE;";
+                command.ExecuteNonQuery();
+            }
+            catch (Npgsql.NpgsqlException)
+            {
+                // Best-effort cleanup — a teardown failure must not fail a
+                // green test run.
+            }
+        }
     }
 }
 
