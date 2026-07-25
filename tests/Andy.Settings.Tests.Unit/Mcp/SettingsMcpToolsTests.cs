@@ -220,45 +220,47 @@ public class SettingsMcpToolsTests
     [Fact]
     public async Task Categories_ReturnsDistinctCategories()
     {
-        // Arrange
-        var definitions = new PagedResult<DefinitionDto>(
-            Items: new[]
-            {
-                new DefinitionDto(Guid.NewGuid(), "app.a", "testapp", "A", null, "UI",
-                    SettingDataType.String, null, null, null, false, null, null, false,
-                    DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, 0),
-                new DefinitionDto(Guid.NewGuid(), "app.b", "testapp", "B", null, "Security",
-                    SettingDataType.String, null, null, null, false, null, null, false,
-                    DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, 0),
-                new DefinitionDto(Guid.NewGuid(), "app.c", "testapp", "C", null, "UI",
-                    SettingDataType.String, null, null, null, false, null, null, false,
-                    DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, 0),
-                new DefinitionDto(Guid.NewGuid(), "app.d", "testapp", "D", null, null,
-                    SettingDataType.String, null, null, null, false, null, null, false,
-                    DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, 0),
-            },
-            TotalCount: 4,
-            Page: 1,
-            PageSize: 1000);
-
         _definitionService
-            .Setup(s => s.SearchAsync(It.IsAny<DefinitionQuery>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(definitions);
+            .Setup(s => s.GetCategoriesAsync(null, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(["Security", "UI"]);
 
-        // Act
         var json = await _sut.Categories();
 
-        // Assert
         json.Should().Contain("categories");
+        var categories = JsonDocument.Parse(json).RootElement.GetProperty("categories");
+        categories.EnumerateArray().Select(e => e.GetString())
+            .Should().BeEquivalentTo(["Security", "UI"]);
+    }
 
-        var doc = JsonDocument.Parse(json);
-        var categories = doc.RootElement.GetProperty("categories");
-        categories.GetArrayLength().Should().Be(2);
+    // The tool used to request a 1000-definition page and reduce it
+    // client-side, so it under-reported as soon as the catalog exceeded that
+    // page — silently, since a truncated page looks identical to a complete
+    // one. It must not paginate at all.
+    [Fact]
+    public async Task Categories_DoesNotApproximateViaAPagedSearch()
+    {
+        _definitionService
+            .Setup(s => s.GetCategoriesAsync(It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(["A"]);
 
-        var categoryList = categories.EnumerateArray().Select(e => e.GetString()).ToList();
-        categoryList.Should().Contain("UI");
-        categoryList.Should().Contain("Security");
-        categoryList.Should().NotContain((string?)null);
+        await _sut.Categories();
+
+        _definitionService.Verify(
+            s => s.SearchAsync(It.IsAny<DefinitionQuery>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task Categories_FiltersByApplicationCode()
+    {
+        _definitionService
+            .Setup(s => s.GetCategoriesAsync("testapp", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(["UI"]);
+
+        var json = await _sut.Categories("testapp");
+
+        JsonDocument.Parse(json).RootElement.GetProperty("categories")
+            .EnumerateArray().Select(e => e.GetString()).Should().BeEquivalentTo(["UI"]);
     }
 
     [Fact]

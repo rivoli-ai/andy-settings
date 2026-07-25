@@ -11,7 +11,7 @@ Andy Settings is the centralized settings registry for the Andy platform. It sto
 ## Core Concepts
 
 - **Definition**: Describes a setting—its key, data type, default value, validation rules, and whether it is secret.
-- **Value**: The concrete assignment of a setting to a specific scope (e.g., a workspace or environment).
+- **Value**: The concrete assignment of a setting to a specific scope (e.g., a user, team, or workspace).
 - **Scope**: The context in which a value applies. Scopes are hierarchical, so a value set at a broader scope can be overridden by a narrower one.
 
 ## Quick Start

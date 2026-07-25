@@ -73,6 +73,24 @@ public class DefinitionRepository : IDefinitionService
             pageSize);
     }
 
+    public async Task<IReadOnlyList<string>> GetCategoriesAsync(
+        string? applicationCode = null, CancellationToken ct = default)
+    {
+        var q = _db.SettingDefinitions.AsNoTracking();
+
+        if (!string.IsNullOrEmpty(applicationCode))
+            q = q.Where(d => d.ApplicationCode == applicationCode);
+
+        // DISTINCT server-side, so the result is complete regardless of how
+        // large the catalog grows.
+        return await q
+            .Where(d => d.Category != null && d.Category != "")
+            .Select(d => d.Category!)
+            .Distinct()
+            .OrderBy(c => c)
+            .ToListAsync(ct);
+    }
+
     public async Task<DefinitionDto> CreateAsync(CreateDefinitionDto dto, string? actorId = null, CancellationToken ct = default)
     {
         var existing = await _db.SettingDefinitions.AnyAsync(d => d.Key == dto.Key, ct);
