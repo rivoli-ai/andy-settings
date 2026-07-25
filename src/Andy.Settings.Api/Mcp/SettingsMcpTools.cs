@@ -196,17 +196,15 @@ public class SettingsMcpTools
     [McpServerTool(Name = "settings_categories")]
     [RequirePermission("definition:read")]
     [Description("List all distinct categories across setting definitions")]
-    public async Task<string> Categories()
+    public async Task<string> Categories(string? applicationCode = null)
     {
-        // Fetch a large page of definitions and extract distinct categories
-        var query = new DefinitionQuery { PageSize = 1000 };
-        var result = await _definitions.SearchAsync(query);
-        var categories = result.Items
-            .Select(d => d.Category)
-            .Where(c => !string.IsNullOrWhiteSpace(c))
-            .Distinct()
-            .OrderBy(c => c)
-            .ToList();
+        // DISTINCT in the database. This used to request a 1000-definition page
+        // and reduce it client-side, which under-reported as soon as the
+        // catalog exceeded that page — and silently, since a truncated page is
+        // indistinguishable from a complete one here. The paging cap added in
+        // #134 made the truncation start at 500 instead of 1000, so the
+        // approximation had to go rather than be re-tuned.
+        var categories = await _definitions.GetCategoriesAsync(applicationCode);
         return JsonSerializer.Serialize(new { categories }, JsonOptions);
     }
 

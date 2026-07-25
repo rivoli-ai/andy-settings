@@ -33,8 +33,24 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
     // no other connection is open. Each factory instance gets a unique
     // database name so xUnit's parallel class execution can't collide.
     // Mirrors andy-agents' SqliteTestWebAppFactory (issue #154).
+    // Keyword form (`Mode=Memory;Cache=Shared`), NOT the URI form
+    // (`file:name?Mode=Memory&Cache=Shared`).
+    //
+    // SQLite parses URI query parameters case-sensitively and expects
+    // lowercase `mode=memory`. `Mode=Memory` inside a file: URI is therefore
+    // silently IGNORED, and SQLite opens a real file named after the database.
+    // This harness was never in-memory: it had left 530 stray SQLite files in
+    // bin/ before anyone noticed, and each run paid real disk I/O.
+    //
+    // It surfaced as a CI failure once the SqliteConcurrencyInterceptor started
+    // enabling WAL on file-backed databases — correctly, since these really
+    // were files — and WAL + shared cache changed cross-connection visibility
+    // enough to break an outbox dispatch assertion on Linux.
+    //
+    // Microsoft.Data.Sqlite translates the keyword form into a proper in-memory
+    // URI itself, so this genuinely is memory-backed.
     private readonly string _connectionString =
-        $"Data Source=file:integration-tests-{Guid.NewGuid():N}?Mode=Memory&Cache=Shared";
+        $"Data Source=integration-tests-{Guid.NewGuid():N};Mode=Memory;Cache=Shared";
     private SqliteConnection? _keepAlive;
 
     /// <summary>

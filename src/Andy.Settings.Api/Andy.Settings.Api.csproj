@@ -31,4 +31,18 @@
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.8.1" />
   </ItemGroup>
 
+  <!-- Ship the Help Center content with the app.
+       HelpController falls back to {ContentRoot}/content/help when the repo-root
+       path is absent, which is the published/Docker case — but nothing copied
+       the files there, so /api/help/topics returned an EMPTY list in every
+       published and containerised deployment. It degrades silently: the
+       controller returns an empty array rather than failing, so the in-app Help
+       Center simply showed nothing. -->
+  <ItemGroup>
+    <Content Include="..\..\content\help\**\*.md"
+             Link="content\help\%(RecursiveDir)%(Filename)%(Extension)"
+             CopyToOutputDirectory="PreserveNewest"
+             CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>
