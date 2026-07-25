@@ -42,11 +42,19 @@ public record ResolveBatchRequest
 /// <summary>
 /// A single entry in the resolution source chain.
 /// </summary>
+/// <param name="IsDefault">
+/// True for the synthetic entry carrying the definition's default value.
+/// That entry reports <see cref="ScopeType.Machine"/> with a null scope id
+/// for wire compatibility, which is indistinguishable from a real
+/// Machine-scope assignment on those two fields alone — consumers must use
+/// this flag to tell them apart.
+/// </param>
 public record SourceChainEntry(
     ScopeType ScopeType,
     string? ScopeId,
     string? ValueJson,
-    bool IsWinner
+    bool IsWinner,
+    bool IsDefault = false
 );
 
 /// <summary>

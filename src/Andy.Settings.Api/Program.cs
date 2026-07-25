@@ -280,19 +280,48 @@ app.UseSwagger();
 app.MapGet("/openapi.json", () => Results.Redirect("/swagger/v1/swagger.json"))
     .ExcludeFromDescription();
 
-// ── Development-only startup ────────────────────────────────────────────────
+// ── Development-only UI ─────────────────────────────────────────────────────
 if (app.Environment.IsDevelopment())
 {
     app.UseSwaggerUI();
+}
 
-    // Auto-migrate
+// ── Schema migration + definition seeding ───────────────────────────────────
+// Runs in EVERY environment (rivoli-ai/andy-settings#128). These used to sit
+// inside the IsDevelopment() block, so the schema was never created in the
+// Embedded, Docker, or Production modes this service explicitly supports (see
+// HostEnvironmentExtensions). Under the Conductor-embedded SQLite provider
+// that failure is especially bad: SQLite creates an empty database file
+// happily, so a missing schema reads as data loss rather than a config error.
+//
+// Seeding is what makes REGISTRATIONS__MANIFEST_PATHS work; gating it on
+// Development made the documented production mechanism a no-op.
+//
+// Set Database:MigrateOnStartup=false when migrations are applied out of band
+// (e.g. a deploy job in a multi-instance Postgres deployment, where concurrent
+// startup migrations would race).
+if (builder.Configuration.GetValue("Database:MigrateOnStartup", true))
+{
     using var scope = app.Services.CreateScope();
-    var db = scope.ServiceProvider.GetRequiredService<SettingsDbContext>();
-    db.Database.Migrate();
+    var logger = scope.ServiceProvider.GetRequiredService<ILoggerFactory>()
+        .CreateLogger("Andy.Settings.Startup");
 
-    // Seed definitions
-    var seeder = scope.ServiceProvider.GetRequiredService<DataSeeder>();
-    await seeder.SeedAsync();
+    try
+    {
+        var db = scope.ServiceProvider.GetRequiredService<SettingsDbContext>();
+        db.Database.Migrate();
+        logger.LogInformation("Database schema is up to date.");
+
+        var seeder = scope.ServiceProvider.GetRequiredService<DataSeeder>();
+        await seeder.SeedAsync();
+    }
+    catch (Exception ex)
+    {
+        // Fail fast. A service that starts without its schema serves 500s on
+        // every request and looks healthy to an orchestrator.
+        logger.LogCritical(ex, "Database migration or seeding failed; aborting startup.");
+        throw;
+    }
 }
 
 // ── Pipeline ────────────────────────────────────────────────────────────────
