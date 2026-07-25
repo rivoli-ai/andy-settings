@@ -1,5 +1,21 @@
 # Implementation Stories
 
+!!! warning "Historical specification — not a live tracker"
+
+    This document is the **original build specification**, kept for the design
+    intent and acceptance criteria it records. Its checkboxes were never
+    maintained: as of 2026-07-24 it contained 67 unchecked criteria and 0
+    checked ones, including many that have been satisfied for months (for
+    example "Enums cover all scope levels and data types" and "AuditRepository
+    has no Update/Delete methods").
+
+    **Do not read the checkboxes as status.** An unchecked box here means
+    nobody ticked it, not that the work is outstanding — the tracker carries no
+    signal in either direction (rivoli-ai/andy-settings#147).
+
+    For what is actually done, in progress, or outstanding, use **GitHub
+    issues**, which are the live tracker for this repository.
+
 Stories organized by epic. Each story has acceptance criteria and references the corresponding project. Stories should be implemented roughly in epic order, though many stories within an epic can be parallelized.
 
 ---

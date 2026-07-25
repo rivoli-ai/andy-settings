@@ -114,7 +114,21 @@ dotnet ef database update \
   --startup-project src/Andy.Settings.Api
 ```
 
-Development mode: auto-migration on startup.
+### Migration on startup
+
+Migrations are applied automatically on startup in **every** environment, and
+registration manifests are seeded at the same point.
+
+They used to run only in `Development`, which meant the `Embedded`, `Docker` and
+`Production` modes booted against a database with no schema — and under the
+Conductor-embedded SQLite provider that presented as data loss, because SQLite
+creates an empty file happily (rivoli-ai/andy-settings#128).
+
+Set `Database:MigrateOnStartup=false` when migrations are applied out of band —
+for example a deploy job fronting a multi-instance PostgreSQL deployment, where
+concurrent startup migrations would race. Startup fails fast if a migration or
+seeding error occurs, rather than serving 500s from a half-built schema while
+looking healthy to an orchestrator.
 
 ### Provider Switching
 

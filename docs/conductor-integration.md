@@ -155,7 +155,20 @@ SQLite database at:
 ~/Library/Application Support/ai.rivoli.conductor/db/andy-settings.sqlite
 ```
 
-Auto-migrated on first startup. Seeded with 25 definitions for all Andy services.
+Migrated and seeded on every startup, in every environment — not just
+`Development`, which is where the migration call used to be gated
+(rivoli-ai/andy-settings#128). Definition counts come from the registration
+manifests configured via `REGISTRATIONS__MANIFEST_PATHS`.
+
+Manifests are reconciled on each boot rather than seeded once: a manifest owns
+its definitions' schema, so changing a default or validation rule in a service's
+`registration.json` now takes effect. Stored values are never touched by the
+seeder, and definitions dropped from a manifest are marked deprecated rather than
+deleted.
+
+Connections set `busy_timeout=30s` and enable WAL, because this single file is
+written concurrently by request threads, the outbox dispatcher, the cleanup job
+and the audit writer.
 
 ## Ports
 
