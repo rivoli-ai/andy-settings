@@ -648,17 +648,46 @@ public class SettingsMcpToolsTests
     {
         // Arrange
         _secretService
-            .Setup(s => s.DeleteSecretAsync("app.api-key", It.IsAny<string?>(), It.IsAny<CancellationToken>()))
-            .Returns(Task.CompletedTask);
+            .Setup(s => s.DeleteSecretAsync(
+                "app.api-key", ScopeType.User, "user1", It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(1);
 
         // Act
-        var json = await _sut.DeleteSecret("app.api-key");
+        var json = await _sut.DeleteSecret("app.api-key", scopeType: "User", scopeId: "user1");
 
         // Assert
         var doc = JsonDocument.Parse(json);
         doc.RootElement.GetProperty("success").GetBoolean().Should().BeTrue();
         doc.RootElement.GetProperty("message").GetString().Should().Contain("app.api-key");
-        _secretService.Verify(s => s.DeleteSecretAsync("app.api-key", It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Once);
+        _secretService.Verify(s => s.DeleteSecretAsync(
+            "app.api-key", ScopeType.User, "user1", It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    // rivoli-ai/andy-settings#138. An agent must state which scope it means —
+    // defaulting to all-scopes would let a model clear one user's credential
+    // and silently wipe every other user's along with it.
+    [Fact]
+    public async Task DeleteSecret_WithoutScopeOrAllScopes_RefusesAndDeletesNothing()
+    {
+        var json = await _sut.DeleteSecret("app.api-key");
+
+        JsonDocument.Parse(json).RootElement.TryGetProperty("error", out _).Should().BeTrue();
+        _secretService.Verify(s => s.DeleteSecretAsync(
+            It.IsAny<string>(), It.IsAny<ScopeType?>(), It.IsAny<string?>(),
+            It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task DeleteSecret_AllScopes_DeletesEveryScope()
+    {
+        _secretService
+            .Setup(s => s.DeleteSecretAsync(
+                "app.api-key", null, null, It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(4);
+
+        var json = await _sut.DeleteSecret("app.api-key", allScopes: true);
+
+        JsonDocument.Parse(json).RootElement.GetProperty("deleted").GetInt32().Should().Be(4);
     }
 
     [Fact]

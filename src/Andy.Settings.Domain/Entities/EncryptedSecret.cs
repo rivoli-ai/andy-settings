@@ -4,7 +4,9 @@ namespace Andy.Settings.Domain.Entities;
 
 /// <summary>
 /// Stores an encrypted secret value for a setting definition at a specific scope.
-/// The value is encrypted using ASP.NET Core Data Protection API (AES-256-GCM)
+/// The value is encrypted using ASP.NET Core Data Protection API (AES-256-CBC
+/// for confidentiality with HMAC-SHA256 for authentication — the framework
+/// default; no UseCryptographicAlgorithms override is configured)
 /// and is only decrypted for users with the <c>secret:read</c> RBAC permission.
 /// </summary>
 public class EncryptedSecret

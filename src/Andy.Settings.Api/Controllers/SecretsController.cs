@@ -113,16 +113,53 @@ public class SecretsController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Deletes a secret at a scope, or — with <c>allScopes=true</c> — every
+    /// stored secret for the definition.
+    /// </summary>
+    /// <remarks>
+    /// BREAKING CHANGE (rivoli-ai/andy-settings#138). This endpoint used to
+    /// take no scope parameters and always delete EVERY scope, so clearing one
+    /// user's credential also wiped the Machine-scope value and every other
+    /// user's — while Set and Rotate were per-scope.
+    ///
+    /// A bare <c>DELETE</c> is now rejected rather than silently reinterpreted
+    /// as a narrower delete. Quietly switching it to Machine-scope would leave
+    /// callers believing they had removed a secret that is still stored, which
+    /// is worse for a secrets API than a loud 400.
+    /// </remarks>
     [HttpDelete("{definitionKey}")]
     [RequirePermission("secret:write")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> DeleteSecret(string definitionKey, CancellationToken ct)
+    public async Task<IActionResult> DeleteSecret(
+        string definitionKey,
+        [FromQuery] ScopeType? scopeType = null,
+        [FromQuery] string? scopeId = null,
+        [FromQuery] bool allScopes = false,
+        CancellationToken ct = default)
     {
+        if (!scopeType.HasValue && !allScopes)
+        {
+            return BadRequest(new
+            {
+                error = "Specify the scope to delete (scopeType, plus scopeId for non-Machine scopes), "
+                      + "or pass allScopes=true to delete every stored secret for this definition."
+            });
+        }
+
+        if (scopeType.HasValue && allScopes)
+        {
+            return BadRequest(new { error = "Pass either a scopeType or allScopes=true, not both." });
+        }
+
         try
         {
-            await _service.DeleteSecretAsync(definitionKey, _currentUser.GetUserId(), ct);
-            return NoContent();
+            var deleted = await _service.DeleteSecretAsync(
+                definitionKey, scopeType, scopeId, _currentUser.GetUserId(), ct);
+
+            return deleted == 0 ? NotFound() : NoContent();
         }
         catch (KeyNotFoundException)
         {

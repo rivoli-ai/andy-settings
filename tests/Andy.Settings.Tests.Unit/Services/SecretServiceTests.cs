@@ -324,7 +324,7 @@ public class SecretServiceTests : IDisposable
             PlaintextValue = "secret-value"
         }, "writer");
 
-        await _sut.DeleteSecretAsync("app.secret.key", "deleter");
+        await _sut.DeleteSecretAsync("app.secret.key", actorId: "deleter");
 
         _auditMock.Verify(
             a => a.RecordAsync(
@@ -341,12 +341,97 @@ public class SecretServiceTests : IDisposable
     {
         await SeedDefinition();
 
-        await _sut.DeleteSecretAsync("app.secret.key", "deleter");
+        await _sut.DeleteSecretAsync("app.secret.key", actorId: "deleter");
 
         _auditMock.Verify(
             a => a.RecordAsync(
                 It.Is<AuditEventDto>(e => e.EventType == AuditEventType.SecretDeleted),
                 It.IsAny<CancellationToken>()),
             Times.Never);
+    }
+
+    // rivoli-ai/andy-settings#138. Deletion used to be all-scopes only, so
+    // clearing one user's credential wiped the Machine-scope value and every
+    // other user's along with it.
+    private async Task SeedThreeScopes()
+    {
+        await SeedDefinition();
+        foreach (var (scope, scopeId) in new[]
+                 {
+                     (ScopeType.Machine, (string?)null),
+                     (ScopeType.User, "user1"),
+                     (ScopeType.User, "user2"),
+                 })
+        {
+            await _sut.SetSecretAsync(new SetSecretDto
+            {
+                DefinitionKey = "app.secret.key",
+                ScopeType = scope,
+                ScopeId = scopeId,
+                PlaintextValue = $"value-for-{scope}-{scopeId ?? "machine"}"
+            }, "writer");
+        }
+    }
+
+    [Fact]
+    public async Task DeleteSecretAsync_ScopedDelete_RemovesOnlyThatScope()
+    {
+        await SeedThreeScopes();
+
+        var deleted = await _sut.DeleteSecretAsync(
+            "app.secret.key", ScopeType.User, "user1", actorId: "deleter");
+
+        deleted.Should().Be(1);
+        (await _db.EncryptedSecrets.CountAsync()).Should().Be(2);
+
+        (await _sut.GetSecretAsync(new GetSecretDto
+        {
+            DefinitionKey = "app.secret.key", ScopeType = ScopeType.User, ScopeId = "user2"
+        })).Should().NotBeNull("another user's secret must survive");
+
+        (await _sut.GetSecretAsync(new GetSecretDto
+        {
+            DefinitionKey = "app.secret.key", ScopeType = ScopeType.Machine
+        })).Should().NotBeNull("the machine-scope secret must survive");
+    }
+
+    [Fact]
+    public async Task DeleteSecretAsync_AllScopes_RemovesEverything()
+    {
+        await SeedThreeScopes();
+
+        var deleted = await _sut.DeleteSecretAsync("app.secret.key", actorId: "deleter");
+
+        deleted.Should().Be(3);
+        (await _db.EncryptedSecrets.CountAsync()).Should().Be(0);
+    }
+
+    [Fact]
+    public async Task DeleteSecretAsync_ScopedDelete_AuditsThatScope()
+    {
+        await SeedThreeScopes();
+
+        await _sut.DeleteSecretAsync("app.secret.key", ScopeType.User, "user1", actorId: "deleter");
+
+        _auditMock.Verify(
+            a => a.RecordAsync(
+                It.Is<AuditEventDto>(e =>
+                    e.EventType == AuditEventType.SecretDeleted &&
+                    e.ScopeType == ScopeType.User &&
+                    e.ScopeId == "user1"),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task DeleteSecretAsync_ScopeWithNoSecret_DeletesNothing()
+    {
+        await SeedThreeScopes();
+
+        var deleted = await _sut.DeleteSecretAsync(
+            "app.secret.key", ScopeType.Team, "team-with-no-secret", actorId: "deleter");
+
+        deleted.Should().Be(0);
+        (await _db.EncryptedSecrets.CountAsync()).Should().Be(3);
     }
 }

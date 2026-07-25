@@ -164,43 +164,67 @@ public class SecretService : ISecretService
         }, actorId, ct);
     }
 
-    public async Task DeleteSecretAsync(string definitionKey, string? actorId = null, CancellationToken ct = default)
+    /// <summary>
+    /// Deletes stored secrets for a definition. Pass <paramref name="scopeType"/>
+    /// to delete a single scope, or leave it null to delete every scope.
+    /// </summary>
+    /// <returns>How many secrets were deleted.</returns>
+    /// <remarks>
+    /// Deletion used to be all-scopes ONLY, with no way to remove one scope's
+    /// secret: clearing a single user's credential wiped the Machine-scope
+    /// value and every other user's along with it, while Set and Rotate were
+    /// per-scope (rivoli-ai/andy-settings#138). The API layer now requires the
+    /// all-scopes form to be requested explicitly.
+    /// </remarks>
+    public async Task<int> DeleteSecretAsync(
+        string definitionKey,
+        ScopeType? scopeType = null,
+        string? scopeId = null,
+        string? actorId = null,
+        CancellationToken ct = default)
     {
         var definition = await _db.SettingDefinitions.FirstOrDefaultAsync(d => d.Key == definitionKey, ct)
             ?? throw new KeyNotFoundException($"Definition '{definitionKey}' not found.");
 
-        var secrets = await _db.EncryptedSecrets
-            .Where(s => s.DefinitionId == definition.Id)
-            .ToListAsync(ct);
+        var query = _db.EncryptedSecrets.Where(s => s.DefinitionId == definition.Id);
+        if (scopeType.HasValue)
+        {
+            var scopeKey = scopeId ?? string.Empty;
+            query = query.Where(s => s.ScopeType == scopeType.Value && s.ScopeKey == scopeKey);
+        }
+
+        var secrets = await query.ToListAsync(ct);
 
         // No rows to delete is a no-op — don't publish a phantom event.
         // Consumers would re-resolve, find no key, and surface a
         // misleading "key was deleted" signal in their UI.
-        if (secrets.Count == 0) return;
+        if (secrets.Count == 0) return 0;
 
         _db.EncryptedSecrets.RemoveRange(secrets);
 
-        // rivoli-ai/conductor#925 (M1.2.1). One event per definition.
+        // rivoli-ai/conductor#925 (M1.2.1). One event per delete call.
         // Per-scope events would be noisier without buying anything —
-        // consumers invalidate by definition key, not scope. ScopeId
-        // is left null in the payload to signal "all scopes".
+        // consumers invalidate by definition key, not scope. A null scopeId
+        // on the all-scopes form still signals "all scopes"; a scoped delete
+        // now carries the scope it actually removed.
         _db.AppendSecretChanged(
             definitionKey: definitionKey,
             definitionId: definition.Id,
-            scopeType: ScopeType.Machine,
-            scopeId: null,
+            scopeType: scopeType ?? ScopeType.Machine,
+            scopeId: scopeType.HasValue ? scopeId : null,
             kind: SecretEventKind.Deleted);
 
         await _db.SaveChangesAsync(ct);
 
         // The delete path published an event but recorded no audit row, so
         // consumers learned about a secret deletion while the audit trail did
-        // not (rivoli-ai/andy-settings#132). ScopeId is null to match the
-        // event's "all scopes" semantics.
+        // not (rivoli-ai/andy-settings#132).
         await _audit.RecordAsync(new AuditEventDto(
             Guid.NewGuid(), AuditEventType.SecretDeleted, definitionKey,
-            ScopeType.Machine, null, "User", actorId,
-            null, null, null, DateTimeOffset.UtcNow), ct);
+            scopeType ?? ScopeType.Machine, scopeType.HasValue ? scopeId : null,
+            "User", actorId, null, null, null, DateTimeOffset.UtcNow), ct);
+
+        return secrets.Count;
     }
 
     private static SecretMetadataDto ToMetadataDto(EncryptedSecret e, string definitionKey) => new(

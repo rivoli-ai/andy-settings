@@ -125,23 +125,78 @@ public class SecretsControllerTests
     }
 
     [Fact]
-    public async Task DeleteSecret_Returns204()
+    public async Task DeleteSecret_ScopedDelete_Returns204()
     {
-        _secretMock.Setup(s => s.DeleteSecretAsync("app.secret.key", It.IsAny<string?>(), It.IsAny<CancellationToken>()))
-            .Returns(Task.CompletedTask);
+        _secretMock.Setup(s => s.DeleteSecretAsync(
+                "app.secret.key", ScopeType.User, "user1", It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(1);
 
-        var result = await _sut.DeleteSecret("app.secret.key", CancellationToken.None);
+        var result = await _sut.DeleteSecret(
+            "app.secret.key", ScopeType.User, "user1", allScopes: false, CancellationToken.None);
 
         result.Should().BeOfType<NoContentResult>();
     }
 
     [Fact]
-    public async Task DeleteSecret_Returns404WhenNotFound()
+    public async Task DeleteSecret_AllScopes_Returns204()
     {
-        _secretMock.Setup(s => s.DeleteSecretAsync("missing.key", It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+        _secretMock.Setup(s => s.DeleteSecretAsync(
+                "app.secret.key", null, null, It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(3);
+
+        var result = await _sut.DeleteSecret(
+            "app.secret.key", null, null, allScopes: true, CancellationToken.None);
+
+        result.Should().BeOfType<NoContentResult>();
+    }
+
+    // rivoli-ai/andy-settings#138. A bare DELETE used to wipe every scope.
+    // It is now rejected rather than silently reinterpreted as a narrower
+    // delete, which would leave the caller believing a still-stored secret
+    // was gone.
+    [Fact]
+    public async Task DeleteSecret_NoScopeAndNoAllScopes_Returns400()
+    {
+        var result = await _sut.DeleteSecret("app.secret.key", null, null, allScopes: false, CancellationToken.None);
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+        _secretMock.Verify(s => s.DeleteSecretAsync(
+            It.IsAny<string>(), It.IsAny<ScopeType?>(), It.IsAny<string?>(),
+            It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task DeleteSecret_BothScopeAndAllScopes_Returns400()
+    {
+        var result = await _sut.DeleteSecret(
+            "app.secret.key", ScopeType.User, "user1", allScopes: true, CancellationToken.None);
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public async Task DeleteSecret_NothingDeleted_Returns404()
+    {
+        _secretMock.Setup(s => s.DeleteSecretAsync(
+                "app.secret.key", ScopeType.Machine, null, It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(0);
+
+        var result = await _sut.DeleteSecret(
+            "app.secret.key", ScopeType.Machine, null, allScopes: false, CancellationToken.None);
+
+        result.Should().BeOfType<NotFoundResult>();
+    }
+
+    [Fact]
+    public async Task DeleteSecret_Returns404WhenDefinitionMissing()
+    {
+        _secretMock.Setup(s => s.DeleteSecretAsync(
+                "missing.key", It.IsAny<ScopeType?>(), It.IsAny<string?>(),
+                It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new KeyNotFoundException("Definition not found"));
 
-        var result = await _sut.DeleteSecret("missing.key", CancellationToken.None);
+        var result = await _sut.DeleteSecret(
+            "missing.key", ScopeType.Machine, null, allScopes: false, CancellationToken.None);
 
         result.Should().BeOfType<NotFoundResult>();
     }
