@@ -14,7 +14,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
-using Microsoft.OpenApi.Models;
+using Microsoft.OpenApi;
 using OpenTelemetry.Trace;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -241,15 +241,13 @@ builder.Services.AddSwaggerGen(options =>
         Scheme = "bearer",
         BearerFormat = "JWT"
     });
-    options.AddSecurityRequirement(new OpenApiSecurityRequirement
+    // Microsoft.OpenApi v2 (via Swashbuckle 10) replaced the
+    // OpenApiSecurityScheme.Reference / OpenApiReference pair with a dedicated
+    // reference type, and AddSecurityRequirement now takes a factory over the
+    // document rather than the requirement itself.
+    options.AddSecurityRequirement(_ => new OpenApiSecurityRequirement
     {
-        {
-            new OpenApiSecurityScheme
-            {
-                Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "Bearer" }
-            },
-            Array.Empty<string>()
-        }
+        { new OpenApiSecuritySchemeReference("Bearer"), new List<string>() }
     });
 });
 
