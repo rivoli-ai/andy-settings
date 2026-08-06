@@ -12,6 +12,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -130,10 +131,18 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
             foreach (var d in natsDescriptors) services.Remove(d);
             services.AddSingleton<IMessageBus, InMemoryMessageBus>();
 
-            // Replace DbContext with SQLite in-memory
+            // Replace DbContext with SQLite in-memory.
+            //
+            // EF Core 9+ also registers IDbContextOptionsConfiguration<SettingsDbContext>,
+            // which still carries the Npgsql configuration. Removing only
+            // DbContextOptions<T> leaves both providers registered, and EF 10 throws
+            // where EF 8 tolerated it: "Only a single database provider can be
+            // registered in a service provider." Drop everything keyed on the context.
             var descriptorsToRemove = services
-                .Where(d => d.ServiceType == typeof(DbContextOptions<SettingsDbContext>)
-                         || d.ServiceType == typeof(DbContextOptions))
+                .Where(d => (d.ServiceType.IsGenericType
+                             && d.ServiceType.GetGenericArguments().Contains(typeof(SettingsDbContext)))
+                         || d.ServiceType == typeof(DbContextOptions)
+                         || d.ServiceType == typeof(SettingsDbContext))
                 .ToList();
             foreach (var d in descriptorsToRemove) services.Remove(d);
 
@@ -144,7 +153,16 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
                 _keepAlive.Open();
 
                 services.AddDbContext<SettingsDbContext>(options =>
-                    options.UseSqlite(_connectionString));
+                    options.UseSqlite(_connectionString)
+                        // The migrations (and therefore the model snapshot) are
+                        // generated for Npgsql; this fallback runs them on SQLite, so
+                        // the built model legitimately differs from the snapshot. EF 10
+                        // promotes that mismatch from a warning to an exception, which
+                        // fails every integration test. Production runs Npgsql and does
+                        // match the snapshot, so this suppression is scoped to the
+                        // SQLite test path only.
+                        .ConfigureWarnings(w =>
+                            w.Ignore(RelationalEventId.PendingModelChangesWarning)));
             }
             else
             {
