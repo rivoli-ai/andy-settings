@@ -245,9 +245,12 @@ builder.Services.AddSwaggerGen(options =>
     // OpenApiSecurityScheme.Reference / OpenApiReference pair with a dedicated
     // reference type, and AddSecurityRequirement now takes a factory over the
     // document rather than the requirement itself.
-    options.AddSecurityRequirement(_ => new OpenApiSecurityRequirement
+    options.AddSecurityRequirement(document => new OpenApiSecurityRequirement
     {
-        { new OpenApiSecuritySchemeReference("Bearer"), new List<string>() }
+        // The reference must be bound to the host document. Without it this
+        // compiles but emits "security": [{}], silently dropping bearer auth
+        // from the generated OpenAPI document.
+        { new OpenApiSecuritySchemeReference("Bearer", document), new List<string>() }
     });
 });
 
